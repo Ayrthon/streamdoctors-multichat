@@ -1,11 +1,18 @@
 <template>
   <v-app>
     <v-main class="d-flex align-center justify-center" style="height: 100vh">
-      <v-btn color="primary">Hello from Vuetify!</v-btn>
+      <v-container class="d-flex flex-column justify-center" width="400">
+        <img class="pb-5" src="/images/cropped-streamdoctors-logo_wit.png" />
+        <v-btn color="primary" to="/dashboard">Login</v-btn>
+      </v-container>
     </v-main>
   </v-app>
 </template>
 
-<script lang="ts" setup></script>
+<script setup lang="ts">
+definePageMeta({
+  layout: 'login',
+})
+</script>
 
 <style></style>
