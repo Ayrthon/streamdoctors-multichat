@@ -7,6 +7,7 @@
       </v-container> -->
 
       <div class="flex min-h-screen flex-col items-center justify-center">
+        <img class="pb-5" src="/images/cropped-streamdoctors-logo_wit.png" />
         <h1 class="mb-4 text-xl">Login</h1>
         <input v-model="email" placeholder="Email" class="mb-2 border p-2" />
         <input v-model="password" placeholder="Password" type="password" class="mb-2 border p-2" />
