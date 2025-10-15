@@ -17,23 +17,32 @@
 </template>
 
 <script setup>
+import { onMounted, ref } from 'vue'
+
+import { signInWithEmailAndPassword } from 'firebase/auth'
+
+// ✅ Page meta (layout)
 definePageMeta({
   layout: 'login',
 })
-</script>
 
-<script>
-import { signInWithEmailAndPassword } from 'firebase/auth'
+const email = ref('')
+const password = ref('')
+let auth = null
 
-const { $auth } = useNuxtApp()
-await signInWithEmailAndPassword($auth, email.value, password.value)
+// ✅ Wait until client is ready before using Firebase
+onMounted(() => {
+  const nuxtApp = useNuxtApp()
+  auth = nuxtApp.$auth
+})
 
 async function login() {
+  if (!auth) return alert('Firebase not ready yet.')
   try {
-    await signInWithEmailAndPassword($auth, email.value, password.value)
+    await signInWithEmailAndPassword(auth, email.value, password.value)
     alert('Logged in!')
-  } catch (e) {
-    console.error(e)
+  } catch (error) {
+    console.error(error)
     alert('Login failed!')
   }
 }
