@@ -1,9 +1,9 @@
+// app/plugins/firebase.client.js
+import { initializeApp } from 'firebase/app'
+import { getAuth } from 'firebase/auth'
+
 export default defineNuxtPlugin(() => {
-  if (process.server) return // <-- ✅ skip completely during SSR / prerender
-
-  const { initializeApp } = require('firebase/app')
-  const { getAuth } = require('firebase/auth')
-
+  // This file runs only on the client because of the .client.js suffix
   const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -16,7 +16,5 @@ export default defineNuxtPlugin(() => {
   const app = initializeApp(firebaseConfig)
   const auth = getAuth(app)
 
-  return {
-    provide: { firebase: app, auth },
-  }
+  return { provide: { firebase: app, auth } }
 })
