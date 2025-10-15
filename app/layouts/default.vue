@@ -2,7 +2,7 @@
   <v-layout class="rounded rounded-md border">
     <v-app-bar elevation="0">
       <img class="pa-5" src="/images/cropped-streamdoctors-logo_wit.png" width="240" />
-      <div class="mt-2">MultiChat v0.2</div>
+      <div class="mt-2">MultiChat v1.2</div>
     </v-app-bar>
     <v-navigation-drawer expand-on-hover permanent rail>
       <v-list>
