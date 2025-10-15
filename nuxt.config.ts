@@ -8,6 +8,10 @@ export default defineNuxtConfig({
     transpile: ['vuetify'],
   },
 
+  nitro: {
+    preset: 'static',
+  },
+
   vite: {
     ssr: {
       noExternal: ['vuetify'],
