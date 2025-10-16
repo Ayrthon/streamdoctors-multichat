@@ -122,7 +122,9 @@ export default {
 
     const createProject = async () => {
       if (!newProjectName.value.trim()) return
+      console.log('[UI] Creating project:', newProjectName.value)
       await projectsStore.addProject(newProjectName.value)
+      console.log('[UI] Done creating project')
       newProjectName.value = ''
       dialog.value = false
     }

@@ -79,7 +79,7 @@
 </template>
 
 <script>
-import { useProjectsStore } from '~/stores/projects'
+import { useProjectsStore } from '~/stores/projectsStore'
 
 export default {
   setup() {
