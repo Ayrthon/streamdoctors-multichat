@@ -18,6 +18,7 @@ export const useProjectsStore = defineStore('projects', {
     currentProject: null,
     loading: false,
     unsubscribe: null,
+    unsubscribeProject: null,
   }),
 
   actions: {
@@ -63,6 +64,10 @@ export const useProjectsStore = defineStore('projects', {
         this.unsubscribe()
         this.unsubscribe = null
       }
+      if (this.unsubscribeProject) {
+        this.unsubscribeProject()
+        this.unsubscribeProject = null
+      }
     },
 
     async addProject(name) {
@@ -80,28 +85,47 @@ export const useProjectsStore = defineStore('projects', {
 
     async deleteProject(id) {
       const { user } = useAuthState()
-      const { firestore } = useNuxtApp()
+      const { firestore } = await useFirebase()
       if (!user.value || !firestore) return
 
       await deleteDoc(doc(firestore, 'users', user.value.uid, 'projects', id))
+
+      // clean up
+      this.currentProject = null
+      if (this.unsubscribeProject) {
+        this.unsubscribeProject()
+        this.unsubscribeProject = null
+      }
     },
     async loadProject(id) {
       const { user } = useAuthState()
       const { firestore } = await useFirebase()
       if (!user.value || !firestore) return
 
+      // Stop any previous listener to avoid duplicates
+      if (this.unsubscribeProject) {
+        this.unsubscribeProject()
+        this.unsubscribeProject = null
+      }
+
       try {
         const projectRef = doc(firestore, 'users', user.value.uid, 'projects', id)
-        const snap = await getDoc(projectRef)
-        if (snap.exists()) {
-          this.currentProject = { id: snap.id, ...snap.data() }
-          console.log('[ProjectsStore] Loaded project:', this.currentProject.name)
-        } else {
-          console.warn('[ProjectsStore] Project not found:', id)
-          this.currentProject = null
-        }
+        this.loading = true
+
+        // 👇 Listen live to changes
+        this.unsubscribeProject = onSnapshot(projectRef, (snap) => {
+          if (snap.exists()) {
+            this.currentProject = { id: snap.id, ...snap.data() }
+            this.loading = false
+            console.log('[ProjectsStore] Realtime project update:', this.currentProject.name)
+          } else {
+            this.currentProject = null
+            this.loading = false
+          }
+        })
       } catch (err) {
         console.error('[ProjectsStore] loadProject() failed:', err)
+        this.loading = false
       }
     },
 

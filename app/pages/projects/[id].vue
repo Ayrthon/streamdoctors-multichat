@@ -111,6 +111,10 @@ export default {
       projectsStore.loadProject(route.params.id)
     })
 
+    onBeforeUnmount(() => {
+      projectsStore.stop()
+    })
+
     const addPlatform = async () => {
       if (!newPlatform.value.type || !newPlatform.value.username) return
       await projectsStore.addPlatform(route.params.id, {

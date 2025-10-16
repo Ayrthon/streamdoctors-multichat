@@ -104,12 +104,14 @@ export default {
 
     // Load projects when mounted
     onMounted(() => {
-      const stopWatch = watch(
+      let stopWatch // declare first
+
+      stopWatch = watch(
         () => role.value,
         (r) => {
           if (r && (r === 'admin' || r === 'client')) {
             projectsStore.init()
-            stopWatch()
+            if (stopWatch) stopWatch() // stop safely
           }
         },
         { immediate: true }
