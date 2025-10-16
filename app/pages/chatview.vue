@@ -1,40 +1,31 @@
 <template>
   <div class="chat-overlay">
-    <h2 v-if="error" class="error">{{ error }}</h2>
+    <div v-for="(msg, i) in messages" :key="i" class="chat-line d-flex align-center ga-2">
+      <!-- Only render the generic icon if we actually have one -->
+      <v-icon
+        v-if="msg.platform && platformIcons[msg.platform]"
+        :icon="platformIcons[msg.platform]"
+        :class="platformColor(msg.platform)"
+        size="20"
+      />
 
-    <div v-else-if="projectId">
-      <!-- <p>Authenticated for project: {{ projectId }}</p>
-      <p v-if="platforms.length">Platforms: {{ platforms.map((p) => p.type).join(', ') }}</p> -->
+      <!-- TikTok custom icon -->
+      <img
+        v-else-if="msg.platform === 'tiktok'"
+        src="assets/icons/tiktok.svg"
+        alt="TikTok"
+        class="icon-svg"
+      />
 
-      <div class="chat-messages">
-        <div v-for="(msg, i) in messages" :key="i" class="chat-line d-flex align-center ga-2">
-          <!-- Only render the generic icon if we actually have one -->
-          <v-icon
-            v-if="msg.platform && platformIcons[msg.platform]"
-            :icon="platformIcons[msg.platform]"
-            :class="platformColor(msg.platform)"
-            size="20"
-          />
+      <!-- Country flag -->
+      <span v-if="msg.country" class="flag">{{ countryFlag(msg.country) }}</span>
 
-          <!-- TikTok custom icon -->
-          <img
-            v-else-if="msg.platform === 'tiktok'"
-            src="assets/icons/tiktok.svg"
-            alt="TikTok"
-            class="icon-svg"
-          />
+      <!-- Username -->
+      <strong :style="{ color: msg.color }">{{ msg.user }}</strong
+      >:
 
-          <!-- Country flag -->
-          <span v-if="msg.country" class="flag">{{ countryFlag(msg.country) }}</span>
-
-          <!-- Username -->
-          <strong :style="{ color: msg.color }">{{ msg.user }}</strong
-          >:
-
-          <!-- Message -->
-          <span v-html="msg.html"></span>
-        </div>
-      </div>
+      <!-- Message -->
+      <span v-html="msg.html"></span>
     </div>
   </div>
 </template>
@@ -130,7 +121,7 @@ function connectYouTubeSSE(liveVideoId, account) {
       color: '#ff0000',
       timestamp: msg.timestamp || Date.now(),
     })
-    if (messages.value.length > 15) messages.value.shift()
+    // if (messages.value.length > 15) messages.value.shift()
   }
 
   source.addEventListener('end', () => {
@@ -215,7 +206,7 @@ watch(
           timestamp: Date.now(),
         })
 
-        if (messages.value.length > 15) messages.value.shift()
+        // if (messages.value.length > 15) messages.value.shift()
       })
 
       onBeforeUnmount(() => client.disconnect())
@@ -247,7 +238,7 @@ watch(
             color: msg.color,
             timestamp: msg.timestamp,
           })
-          if (messages.value.length > 15) messages.value.shift()
+          //if (messages.value.length > 15) messages.value.shift()
         }
 
         source.onerror = (err) => {
@@ -289,8 +280,7 @@ onMounted(async () => {
   inset: 0;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end; /* ✅ pushes messages to bottom */
-  align-items: flex-start;
+  justify-content: flex-end; /* ✅ ensures chat container sits at bottom */
   background: transparent;
   color: white;
   padding: 1rem;
@@ -298,15 +288,16 @@ onMounted(async () => {
   height: 100vh;
   pointer-events: none;
 }
+
 .chat-messages {
   display: flex;
-  flex-direction: column; /* ✅ normal order */
-  justify-content: flex-end; /* ✅ keeps messages anchored bottom */
+  flex-direction: column;
+  justify-content: flex-end;
   gap: 0.25rem;
-  max-height: 90vh;
   width: 100%;
-  overflow: hidden;
+  padding-bottom: 0.5rem;
 }
+
 .chat-line {
   text-shadow: 0 0 4px black;
   font-size: 2rem;
