@@ -85,13 +85,13 @@ export default {
   setup() {
     const route = useRoute()
     const router = useRouter()
+    const { user } = useAuthState()
     const projectsStore = useProjectsStore()
     const project = computed(() => projectsStore.currentProject)
     const dialog = ref(false)
     const newPlatform = ref({ type: '', country: '', username: '' })
 
-    const chatUrl = computed(() => `${window.location.origin}/chatview?project=${route.params.id}`)
-
+    const chatUrl = ref('')
     const iconFor = (type) => {
       switch (type) {
         case 'twitch':
@@ -107,8 +107,16 @@ export default {
       }
     }
 
-    onMounted(() => {
+    onMounted(async () => {
       projectsStore.loadProject(route.params.id)
+
+      // Generate secure token for this project
+      const res = await $fetch('/api/token', {
+        method: 'POST',
+        body: { projectId: route.params.id, uid: user.value.uid, forceRefresh: force },
+      })
+
+      chatUrl.value = `${window.location.origin}/chatview?token=${res.token}`
     })
 
     onBeforeUnmount(() => {

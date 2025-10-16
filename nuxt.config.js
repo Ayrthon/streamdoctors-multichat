@@ -4,15 +4,16 @@ import vuetify from 'vite-plugin-vuetify'
 
 export default defineNuxtConfig({
   srcDir: 'app/',
+  scanDirs: ['app/server'],
   compatibilityDate: '2025-10-16',
   build: {
     transpile: ['vuetify'],
   },
-
   nitro: {
-    preset: 'static',
+    preset: 'node',
+    serverDir: 'app/server', // ✅ tell Nitro where to find your API handlers
     prerender: {
-      crawlLinks: false, // 🔒 stops Nuxt from auto-visiting pages that might import Firebase
+      crawlLinks: false,
       routes: ['/', '/200.html', '/404.html'],
       ignore: ['/login', '/dashboard', '/auth'],
     },
