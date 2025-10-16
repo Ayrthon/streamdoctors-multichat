@@ -3,28 +3,48 @@
     <v-main class="d-flex align-center justify-center" style="height: 100vh">
       <v-container class="text-center">
         <!-- <img class="pb-5" src="/images/cropped-streamdoctors-logo_wit.png" /> -->
-        <v-btn color="primary" @click="loginWithGoogle">Sign in with Google</v-btn>
+        <v-btn @click="loginWithGoogle">Login with Google</v-btn>
       </v-container>
     </v-main>
   </v-app>
 </template>
 
-<script setup>
+<script>
 import { signInWithPopup } from 'firebase/auth'
 
-definePageMeta({ layout: 'login' })
+export default {
+  setup() {
+    definePageMeta({ layout: 'login' })
 
-const { $auth, $provider } = useNuxtApp()
+    const { $auth, $provider } = useNuxtApp()
+    const router = useRouter()
+    const { user } = useAuthState()
 
-const loginWithGoogle = async () => {
-  try {
-    const result = await signInWithPopup($auth, $provider)
-    const user = result.user
-    console.log('Logged in:', user.displayName, user.email)
-    alert(`Welcome, ${user.displayName}!`)
-  } catch (err) {
-    console.error('Google login failed:', err)
-    alert('Login failed, please try again.')
-  }
+    const loginWithGoogle = async () => {
+      try {
+        const result = await signInWithPopup($auth, $provider)
+        const loggedInUser = result.user
+        console.log('Logged in:', loggedInUser.displayName)
+
+        // Immediately update our state
+        user.value = loggedInUser
+
+        // Redirect to projects
+        router.push('/projects')
+      } catch (err) {
+        console.error('Google login failed:', err)
+        alert('Login failed, please try again.')
+      }
+    }
+
+    // If already logged in, skip login page
+    watchEffect(() => {
+      if (user.value) {
+        router.push('/projects')
+      }
+    })
+
+    return { loginWithGoogle }
+  },
 }
 </script>

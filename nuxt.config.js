@@ -24,4 +24,7 @@ export default defineNuxtConfig({
     },
     plugins: [vuetify()],
   },
+  imports: {
+    dirs: ['app/composables', 'app/middleware'],
+  },
 })

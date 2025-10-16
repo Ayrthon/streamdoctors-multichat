@@ -25,6 +25,7 @@
         <v-list-item prepend-icon="mdi-account-multiple" title="Users" value="shared"></v-list-item>
         <v-list-item prepend-icon="mdi-cog" title="Settings" value="starred"></v-list-item>
       </v-list>
+      <v-btn v-if="user" text @click="logout">Logout</v-btn>
     </v-navigation-drawer>
     <v-main>
       <NuxtPage />
@@ -33,6 +34,29 @@
   </v-layout>
 </template>
 
-<script lang="ts" setup></script>
+<script>
+import { signOut } from 'firebase/auth'
+
+export default {
+  setup() {
+    const { $auth } = useNuxtApp()
+    const { user } = useAuthState()
+    const router = useRouter()
+
+    const logout = async () => {
+      try {
+        await signOut($auth)
+        user.value = null
+        router.push('/')
+      } catch (error) {
+        console.error('Logout failed:', error)
+        alert('Error logging out.')
+      }
+    }
+
+    return { user, logout }
+  },
+}
+</script>
 
 <style></style>
