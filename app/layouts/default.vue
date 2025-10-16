@@ -5,28 +5,28 @@
       <div class="mt-2">MultiChat v1.2</div>
     </v-app-bar>
     <v-navigation-drawer expand-on-hover permanent rail>
-      <v-list>
-        <v-list-item
-          prepend-avatar="https://randomuser.me/api/portraits/men/13.jpg"
-          subtitle="ayrthon@streamdoctors.com"
-          title="Ayrthon"
-        ></v-list-item>
-      </v-list>
-
       <v-divider></v-divider>
 
       <v-list density="compact" nav>
-        <v-list-item
-          prepend-icon="mdi-folder"
-          title="Projects"
-          value="projects"
-          to="/projects"
-        ></v-list-item>
-        <v-list-item prepend-icon="mdi-account-multiple" title="Users" value="shared"></v-list-item>
-        <v-list-item prepend-icon="mdi-cog" title="Settings" value="starred"></v-list-item>
+        <v-list-item prepend-icon="mdi-folder" title="Projects" value="projects" to="/projects" />
+        <v-list-item prepend-icon="mdi-account-multiple" title="Users" value="users" />
+        <v-list-item prepend-icon="mdi-cog" title="Settings" value="settings" />
       </v-list>
-      <v-btn v-if="user" text @click="logout">Logout</v-btn>
+
+      <!-- Logout section anchored at bottom -->
+      <template v-slot:append>
+        <v-divider></v-divider>
+        <v-list density="compact" nav>
+          <v-list-item
+            v-if="user"
+            prepend-icon="mdi-account"
+            :title="`${user.email || user.displayName}`"
+          />
+          <v-list-item v-if="user" prepend-icon="mdi-logout" title="Logout" @click="logout" />
+        </v-list>
+      </template>
     </v-navigation-drawer>
+
     <v-main>
       <NuxtPage />
     </v-main>

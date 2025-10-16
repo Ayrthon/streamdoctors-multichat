@@ -3,7 +3,7 @@
     <v-main class="d-flex align-center justify-center" style="height: 100vh">
       <v-container class="text-center">
         <!-- <img class="pb-5" src="/images/cropped-streamdoctors-logo_wit.png" /> -->
-        <v-btn @click="loginWithGoogle">Login with Google</v-btn>
+        <v-btn color="white" @click="loginWithGoogle">Login with Google</v-btn>
       </v-container>
     </v-main>
   </v-app>
