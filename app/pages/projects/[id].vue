@@ -110,19 +110,20 @@ export default {
     onMounted(async () => {
       await projectsStore.loadProject(route.params.id)
 
-      // ✅ Wait for the realtime snapshot to populate currentProject
-      await new Promise((resolve) => {
-        const stop = watch(
-          () => project.value,
-          (val) => {
-            if (val && val.platforms) {
-              stop()
-              resolve()
-            }
-          },
-          { immediate: true }
-        )
-      })
+      if (!project.value?.platforms) {
+        await new Promise((resolve) => {
+          const unwatch = watch(
+            () => project.value?.platforms,
+            (val) => {
+              if (val) {
+                unwatch()
+                resolve()
+              }
+            },
+            { immediate: true }
+          )
+        })
+      }
 
       // ✅ Now platforms are guaranteed to exist
       const res = await $fetch('/api/token', {

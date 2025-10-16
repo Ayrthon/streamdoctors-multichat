@@ -3,13 +3,27 @@
     <h2 v-if="error" class="error">{{ error }}</h2>
 
     <div v-else-if="projectId">
-      <p>Authenticated for project: {{ projectId }}</p>
-      <p v-if="platforms.length">Platforms: {{ platforms.map((p) => p.type).join(', ') }}</p>
+      <!-- <p>Authenticated for project: {{ projectId }}</p>
+      <p v-if="platforms.length">Platforms: {{ platforms.map((p) => p.type).join(', ') }}</p> -->
 
       <div class="chat-messages">
-        <div v-for="(msg, i) in messages" :key="i" class="chat-line">
-          <strong>{{ msg.user }}</strong
+        <div v-for="(msg, i) in messages" :key="i" class="chat-line d-flex align-center ga-2">
+          <!-- Platform icon -->
+          <v-icon
+            v-if="msg.platform"
+            :icon="platformIcons[msg.platform]"
+            :class="platformColor(msg.platform)"
+            size="20"
+          />
+
+          <!-- Country flag -->
+          <span v-if="msg.country" class="flag">{{ countryFlag(msg.country) }}</span>
+
+          <!-- Username -->
+          <strong :style="{ color: msg.color }">{{ msg.user }}</strong
           >:
+
+          <!-- Message -->
           <span v-html="msg.html"></span>
         </div>
       </div>
@@ -21,6 +35,33 @@
 import { useRoute } from 'vue-router'
 
 import tmi from 'tmi.js'
+
+// --- ICON + FLAG helpers ---
+const platformIcons = {
+  twitch: 'mdi-twitch',
+  youtube: 'mdi-youtube',
+  instagram: 'mdi-instagram',
+}
+
+const platformColor = (platform) => {
+  switch (platform) {
+    case 'twitch':
+      return 'text-purple'
+    case 'youtube':
+      return 'text-red'
+    case 'instagram':
+      return 'text-pink'
+    default:
+      return ''
+  }
+}
+
+function countryFlag(code) {
+  if (!code) return ''
+  return code
+    .toUpperCase()
+    .replace(/./g, (char) => String.fromCodePoint(127397 + char.charCodeAt(0)))
+}
 
 definePageMeta({
   layout: false,
@@ -105,8 +146,6 @@ watch(
       if (self) return
 
       const html = parseTwitchEmotes(message, tags.emotes)
-
-      // Find platform + country for this channel
       const platform = 'twitch'
       const platformData = platforms.value.find(
         (p) =>
@@ -119,6 +158,7 @@ watch(
         country,
         channel,
         user: tags['display-name'] || tags.username,
+        color: tags.color || '#ffffff', // ✅ default white if none
         html,
       })
 
@@ -146,7 +186,6 @@ watch(
   height: 100vh;
   pointer-events: none;
 }
-
 .chat-messages {
   display: flex;
   flex-direction: column; /* ✅ normal order */
@@ -156,19 +195,33 @@ watch(
   width: 100%;
   overflow: hidden;
 }
-
 .chat-line {
   text-shadow: 0 0 4px black;
-  font-size: 1rem;
+  font-size: 2rem;
   line-height: 1.3;
   opacity: 0.9;
   animation: fade-in 0.3s ease;
 }
-
 .emote {
   vertical-align: middle;
   height: 1.5em;
   margin: 0 0.1em;
+}
+.flag {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.chat-line strong {
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+}
+.text-purple {
+  color: #9146ff !important; /* Twitch purple */
+}
+.text-red {
+  color: #ff0000 !important; /* YouTube red */
+}
+.text-pink {
+  color: #ff009d !important; /* Kick green */
 }
 
 @keyframes fade-in {
@@ -181,7 +234,6 @@ watch(
     transform: translateY(0);
   }
 }
-
 .error {
   color: red;
 }
