@@ -32,5 +32,6 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     jwtSecret: process.env.JWT_SECRET,
+    youtubeApiKey: process.env.YOUTUBE_API_KEY,
   },
 })
