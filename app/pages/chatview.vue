@@ -8,12 +8,20 @@
 
       <div class="chat-messages">
         <div v-for="(msg, i) in messages" :key="i" class="chat-line d-flex align-center ga-2">
-          <!-- Platform icon -->
+          <!-- Only render the generic icon if we actually have one -->
           <v-icon
-            v-if="msg.platform"
+            v-if="msg.platform && platformIcons[msg.platform]"
             :icon="platformIcons[msg.platform]"
             :class="platformColor(msg.platform)"
             size="20"
+          />
+
+          <!-- TikTok custom icon -->
+          <img
+            v-else-if="msg.platform === 'tiktok'"
+            src="assets/icons/tiktok.svg"
+            alt="TikTok"
+            class="icon-svg"
           />
 
           <!-- Country flag -->
@@ -326,6 +334,13 @@ onMounted(async () => {
 }
 .text-pink {
   color: #ff009d !important; /* Kick green */
+}
+
+.icon-svg {
+  width: 0.5em;
+  height: 0.5em;
+  vertical-align: middle;
+  filter: brightness(0) invert(1); /* turns black SVG white */
 }
 
 @keyframes fade-in {

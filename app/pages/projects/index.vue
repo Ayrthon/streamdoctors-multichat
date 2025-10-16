@@ -37,11 +37,25 @@
             </div>
 
             <div v-else>
-              <div v-for="(platform, index) in project.platforms" :key="index" class="mb-1">
-                <v-icon :color="iconColor(platform.type)" class="mr-1">{{
-                  iconFor(platform.type)
-                }}</v-icon>
+              <div
+                v-for="(platform, index) in project.platforms"
+                :key="index"
+                class="d-flex align-center mb-1"
+              >
+                <!-- Normal icons (YouTube, Twitch, etc.) -->
+                <v-icon
+                  v-if="platform.type !== 'tiktok'"
+                  :color="iconColor(platform.type)"
+                  class="mr-1"
+                >
+                  {{ iconFor(platform.type) }}
+                </v-icon>
+
+                <!-- TikTok SVG icon -->
+                <img v-else src="assets/icons/tiktok.svg" alt="TikTok" class="icon-svg mr-1" />
+
                 {{ platform.username }}
+
                 <v-chip size="small" :color="platform.connected ? 'success' : 'error'" class="ml-1">
                   {{ platform.connected ? 'connected' : 'disconnected' }}
                 </v-chip>
@@ -153,7 +167,7 @@ export default {
         case 'twitch':
           return 'purple'
         case 'tiktok':
-          return 'black'
+          return '#00f2ea' // TikTok cyan
         case 'instagram':
           return 'orange'
         default:
@@ -184,6 +198,13 @@ export default {
   box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
   animation: pulse 1.5s infinite;
 }
+.icon-svg {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  filter: brightness(0) invert(1); /* makes black SVG white */
+}
+
 @keyframes pulse {
   0% {
     transform: scale(0.9);

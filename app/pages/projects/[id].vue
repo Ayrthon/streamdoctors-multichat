@@ -13,10 +13,19 @@
 
     <div class="d-flex ga-4 flex-wrap">
       <v-card v-for="(p, index) in project.platforms" :key="index" width="300" variant="tonal">
-        <v-card-title>
-          <v-icon class="mr-2">
+        <v-card-title class="d-flex align-center ga-2">
+          <!-- Custom TikTok SVG -->
+          <span
+            v-if="p.type === 'tiktok'"
+            class="svg-icon"
+            :style="{ color: iconColor('tiktok') }"
+          ></span>
+
+          <!-- All other icons -->
+          <v-icon v-else :color="iconColor(p.type)" class="mr-2">
             {{ iconFor(p.type) }}
           </v-icon>
+
           {{ p.type.toUpperCase() }}
         </v-card-title>
 
@@ -107,6 +116,21 @@ export default {
       }
     }
 
+    const iconColor = (type) => {
+      switch (type) {
+        case 'youtube':
+          return 'red'
+        case 'twitch':
+          return 'purple'
+        case 'tiktok':
+          return 'white'
+        case 'instagram':
+          return 'orange'
+        default:
+          return 'grey'
+      }
+    }
+
     onMounted(async () => {
       await projectsStore.loadProject(route.params.id)
 
@@ -173,6 +197,7 @@ export default {
       dialog,
       newPlatform,
       iconFor,
+      iconColor,
       chatUrl,
       addPlatform,
       removePlatform,
@@ -182,3 +207,15 @@ export default {
   },
 }
 </script>
+
+<style scoped>
+.svg-icon {
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+  background-color: currentColor;
+  -webkit-mask: url('assets/icons/tiktok.svg') no-repeat center / contain;
+  mask: url('assets/icons/tiktok.svg') no-repeat center / contain;
+  vertical-align: middle;
+}
+</style>
