@@ -121,7 +121,7 @@ function connectYouTubeSSE(liveVideoId, account) {
       color: '#ff0000',
       timestamp: msg.timestamp || Date.now(),
     })
-    // if (messages.value.length > 15) messages.value.shift()
+    if (messages.value.length > 100) messages.value.shift()
   }
 
   source.addEventListener('end', () => {
@@ -206,7 +206,7 @@ watch(
           timestamp: Date.now(),
         })
 
-        // if (messages.value.length > 15) messages.value.shift()
+        if (messages.value.length > 100) messages.value.shift()
       })
 
       onBeforeUnmount(() => client.disconnect())
@@ -238,7 +238,7 @@ watch(
             color: msg.color,
             timestamp: msg.timestamp,
           })
-          //if (messages.value.length > 15) messages.value.shift()
+          if (messages.value.length > 100) messages.value.shift()
         }
 
         source.onerror = (err) => {
