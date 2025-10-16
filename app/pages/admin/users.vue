@@ -43,28 +43,41 @@
   </v-container>
 </template>
 
-<script setup>
+<script>
+import { storeToRefs } from 'pinia'
 import { useAuthState } from '~/composables/useAuthState'
-import { useUsers } from '~/stores/useUsers'
+import { useUsers } from '~/stores/usersStore'
 
-const { role } = useAuthState()
-const usersStore = useUsers()
-const { users, loading } = storeToRefs(usersStore)
+export default {
+  setup() {
+    const { role } = useAuthState()
+    const usersStore = useUsers()
+    const { users, loading } = storeToRefs(usersStore)
+    const router = useRouter()
 
-onMounted(() => {
-  if (role.value !== 'admin') {
-    alert('You are not authorized to access this page.')
-    navigateTo('/')
-  } else {
-    usersStore.initListener()
-  }
-})
+    onMounted(() => {
+      if (role.value !== 'admin') {
+        alert('You are not authorized to access this page.')
+        router.push('/')
+      } else {
+        usersStore.initListener()
+      }
+    })
 
-onBeforeUnmount(() => {
-  usersStore.stopListener()
-})
+    onBeforeUnmount(() => {
+      usersStore.stopListener()
+    })
 
-const changeRole = async (uid, newRole) => {
-  await usersStore.updateRole(uid, newRole)
+    const changeRole = async (uid, newRole) => {
+      await usersStore.updateRole(uid, newRole)
+    }
+
+    return {
+      role,
+      users,
+      loading,
+      changeRole,
+    }
+  },
 }
 </script>

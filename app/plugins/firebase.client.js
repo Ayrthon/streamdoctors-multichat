@@ -1,8 +1,9 @@
 // app/plugins/firebase.client.js
 import { getApp, getApps, initializeApp } from 'firebase/app'
 import { GoogleAuthProvider, getAuth } from 'firebase/auth'
+import { getFirestore } from 'firebase/firestore'
 
-export default defineNuxtPlugin(() => {
+export default defineNuxtPlugin((nuxtApp) => {
   const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -16,11 +17,17 @@ export default defineNuxtPlugin(() => {
   const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
 
   const auth = getAuth(app)
+  const firestore = getFirestore(app)
   const provider = new GoogleAuthProvider()
 
-  console.info('[Firebase] Initialized app:', app.name)
+  console.log('✅ Firebase plugin initialized in Nuxt:', { app, auth, firestore })
 
-  return {
-    provide: { firebase: app, auth, provider },
-  }
+  // ✅ Provide globally to all composables/stores
+  nuxtApp.provide('firebase', app)
+  nuxtApp.provide('auth', auth)
+  console.log('[useNuxtApp() contents]', Object.keys(useNuxtApp()))
+  console.log('[firestore]', firestore)
+  nuxtApp.provide('firestore', firestore)
+
+  nuxtApp.provide('provider', provider)
 })

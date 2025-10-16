@@ -1,34 +1,54 @@
 <template>
   <div class="pa-4">
-    <v-chip v-if="role === 'pending'" color="warning">Waiting for Admin to give you access.</v-chip>
-    <div v-if="role === 'admin'">
+    <!-- Pending users -->
+    <v-chip v-if="role === 'pending'" color="warning">
+      Waiting for Admin to give you access.
+    </v-chip>
+
+    <!-- Only visible for admin or client -->
+    <div v-else-if="role === 'admin' || role === 'client'">
       <div class="pb-4">
         <v-toolbar>
-          <v-toolbar-title text="Projects"></v-toolbar-title>
-          <template v-slot:append>
-            <v-btn icon="mdi-plus"></v-btn>
+          <v-toolbar-title>Projects</v-toolbar-title>
+          <template #append>
+            <v-btn icon="mdi-plus" @click="dialog = true" />
           </template>
         </v-toolbar>
       </div>
 
-      <div class="d-flex ga-4">
+      <!-- Loading indicator -->
+      <v-progress-linear v-if="projectsStore.loading" indeterminate color="primary" class="mb-4" />
+
+      <!-- Projects grid -->
+      <div class="d-flex ga-4 flex-wrap">
         <v-card
-          elevation="16"
+          v-for="project in projectsStore.projects"
+          :key="project.id"
+          elevation="12"
           variant="tonal"
           width="350"
           class="d-flex flex-column justify-space-between"
         >
-          <v-card-title>Samsung Hangout</v-card-title>
+          <v-card-title>{{ project.name }}</v-card-title>
+
           <v-card-text>
-            <v-icon color="red">mdi-youtube</v-icon> SamsungNederland
-            <v-chip color="success">connected <span class="status-dot"></span></v-chip><br />
-            <v-icon color="red">mdi-youtube</v-icon> SamsungBelgium
-            <v-chip color="success">connected <span class="status-dot"></span></v-chip><br />
-            <v-icon>mdi-alpha-t</v-icon> SamsungNederland <v-chip color="error">disconnected</v-chip
-            ><br />
-            <v-icon>mdi-alpha-t</v-icon> SamsungBelgium
-            <v-chip color="error">disconnected</v-chip>
+            <div v-if="!project.platforms || project.platforms.length === 0">
+              <v-chip color="error">No platforms yet</v-chip>
+            </div>
+
+            <div v-else>
+              <div v-for="(platform, index) in project.platforms" :key="index" class="mb-1">
+                <v-icon :color="iconColor(platform.type)" class="mr-1">{{
+                  iconFor(platform.type)
+                }}</v-icon>
+                {{ platform.username }}
+                <v-chip size="small" :color="platform.connected ? 'success' : 'error'" class="ml-1">
+                  {{ platform.connected ? 'connected' : 'disconnected' }}
+                </v-chip>
+              </div>
+            </div>
           </v-card-text>
+
           <v-card-actions class="mt-auto">
             <v-btn
               append-icon="mdi-chevron-right"
@@ -36,45 +56,116 @@
               text="Open project"
               variant="outlined"
               block
-            ></v-btn>
+              :to="`/projects/${project.id}`"
+            />
           </v-card-actions>
         </v-card>
 
+        <!-- Empty state -->
         <v-card
-          elevation="16"
-          variant="tonal"
+          v-if="!projectsStore.loading && projectsStore.projects.length === 0"
           width="350"
-          class="d-flex flex-column justify-space-between"
+          elevation="0"
+          variant="text"
+          class="d-flex flex-column align-center pa-6 justify-center text-center"
         >
-          <v-card-title>HEMA</v-card-title>
-          <v-card-text>
-            <v-icon color="red">mdi-youtube</v-icon> Hema
-            <v-chip color="success">connected <span class="status-dot"></span></v-chip><br />
-            <v-icon>mdi-alpha-t</v-icon> Hema
-            <v-chip color="success">connected <span class="status-dot"></span></v-chip><br />
-            <v-icon color="purple">mdi-instagram</v-icon> Hema
-            <v-chip color="error">disconnected</v-chip>
-          </v-card-text>
-          <v-card-actions class="mt-auto">
-            <v-btn
-              append-icon="mdi-chevron-right"
-              color="primary"
-              text="Open project"
-              variant="outlined"
-              block
-            ></v-btn>
-          </v-card-actions>
+          <v-icon size="40" class="mb-2">mdi-folder-plus</v-icon>
+          <div>No projects yet. Click + to create one.</div>
         </v-card>
       </div>
     </div>
+
+    <!-- Add Project Dialog -->
+    <v-dialog v-model="dialog" max-width="400">
+      <v-card>
+        <v-card-title>Add New Project</v-card-title>
+        <v-card-text>
+          <v-text-field label="Project name" v-model="newProjectName" autofocus />
+        </v-card-text>
+        <v-card-actions>
+          <v-btn text="Cancel" @click="dialog = false" />
+          <v-btn color="primary" text="Create" @click="createProject" />
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
 <script>
+import { useProjectsStore } from '~/stores/projectsStore'
+
 export default {
   setup() {
     const { role } = useAuthState()
-    return { role }
+    const projectsStore = useProjectsStore()
+
+    const dialog = ref(false)
+    const newProjectName = ref('')
+
+    // Load projects when mounted
+    onMounted(() => {
+      const stopWatch = watch(
+        () => role.value,
+        (r) => {
+          if (r && (r === 'admin' || r === 'client')) {
+            projectsStore.init()
+            stopWatch()
+          }
+        },
+        { immediate: true }
+      )
+    })
+
+    onBeforeUnmount(() => {
+      projectsStore.stop()
+    })
+
+    const createProject = async () => {
+      if (!newProjectName.value.trim()) return
+      await projectsStore.addProject(newProjectName.value)
+      newProjectName.value = ''
+      dialog.value = false
+    }
+
+    const iconFor = (type) => {
+      switch (type) {
+        case 'youtube':
+          return 'mdi-youtube'
+        case 'twitch':
+          return 'mdi-twitch'
+        case 'tiktok':
+          return 'mdi-alpha-t'
+        case 'instagram':
+          return 'mdi-instagram'
+        default:
+          return 'mdi-earth'
+      }
+    }
+
+    const iconColor = (type) => {
+      switch (type) {
+        case 'youtube':
+          return 'red'
+        case 'twitch':
+          return 'purple'
+        case 'tiktok':
+          return 'black'
+        case 'instagram':
+          return 'orange'
+        default:
+          return 'grey'
+      }
+    }
+
+    return {
+      role,
+      dialog,
+      newProjectName,
+      projectsStore,
+      createProject,
+      iconFor,
+      iconColor,
+    }
   },
 }
 </script>
@@ -89,7 +180,6 @@ export default {
   box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
   animation: pulse 1.5s infinite;
 }
-
 @keyframes pulse {
   0% {
     transform: scale(0.9);
