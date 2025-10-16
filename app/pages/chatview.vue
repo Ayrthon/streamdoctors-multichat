@@ -347,4 +347,10 @@ onMounted(async () => {
 .error {
   color: red;
 }
+
+:global(html),
+:global(body) {
+  overflow: hidden;
+  height: 100%;
+}
 </style>
