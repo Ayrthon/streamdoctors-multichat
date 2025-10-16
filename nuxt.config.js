@@ -3,6 +3,8 @@ import { defineNuxtConfig } from 'nuxt/config'
 import vuetify from 'vite-plugin-vuetify'
 
 export default defineNuxtConfig({
+  srcDir: 'app/',
+  compatibilityDate: '2025-10-16',
   build: {
     transpile: ['vuetify'],
   },

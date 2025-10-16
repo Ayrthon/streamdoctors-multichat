@@ -1,52 +1,30 @@
 <template>
   <v-app>
     <v-main class="d-flex align-center justify-center" style="height: 100vh">
-      <!-- <v-container class="d-flex flex-column justify-center" width="400">
-        <img class="pb-5" src="/images/cropped-streamdoctors-logo_wit.png" />
-        <v-btn color="primary" to="/projects">Login</v-btn>
-      </v-container> -->
-
-      <div class="flex min-h-screen flex-col items-center justify-center">
-        <img class="pb-5" src="/images/cropped-streamdoctors-logo_wit.png" />
-        <h1 class="mb-4 text-xl">Login</h1>
-        <input v-model="email" placeholder="Email" class="mb-2 border p-2" />
-        <input v-model="password" placeholder="Password" type="password" class="mb-2 border p-2" />
-        <button @click="login" class="rounded bg-blue-500 px-4 py-2 text-white">Login</button>
-      </div>
+      <v-container class="text-center">
+        <!-- <img class="pb-5" src="/images/cropped-streamdoctors-logo_wit.png" /> -->
+        <v-btn color="primary" @click="loginWithGoogle">Sign in with Google</v-btn>
+      </v-container>
     </v-main>
   </v-app>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { signInWithPopup } from 'firebase/auth'
 
-import { signInWithEmailAndPassword } from 'firebase/auth'
+definePageMeta({ layout: 'login' })
 
-// ✅ Page meta (layout)
-definePageMeta({
-  layout: 'login',
-})
+const { $auth, $provider } = useNuxtApp()
 
-const email = ref('')
-const password = ref('')
-let auth = null
-
-// ✅ Wait until client is ready before using Firebase
-onMounted(() => {
-  const nuxtApp = useNuxtApp()
-  auth = nuxtApp.$auth
-})
-
-async function login() {
-  if (!auth) return alert('Firebase not ready yet.')
+const loginWithGoogle = async () => {
   try {
-    await signInWithEmailAndPassword(auth, email.value, password.value)
-    alert('Logged in!')
-  } catch (error) {
-    console.error(error)
-    alert('Login failed!')
+    const result = await signInWithPopup($auth, $provider)
+    const user = result.user
+    console.log('Logged in:', user.displayName, user.email)
+    alert(`Welcome, ${user.displayName}!`)
+  } catch (err) {
+    console.error('Google login failed:', err)
+    alert('Login failed, please try again.')
   }
 }
 </script>
-
-<style></style>
