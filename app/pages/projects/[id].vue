@@ -108,12 +108,30 @@ export default {
     }
 
     onMounted(async () => {
-      projectsStore.loadProject(route.params.id)
+      await projectsStore.loadProject(route.params.id)
 
-      // Generate secure token for this project
+      // ✅ Wait for the realtime snapshot to populate currentProject
+      await new Promise((resolve) => {
+        const stop = watch(
+          () => project.value,
+          (val) => {
+            if (val && val.platforms) {
+              stop()
+              resolve()
+            }
+          },
+          { immediate: true }
+        )
+      })
+
+      // ✅ Now platforms are guaranteed to exist
       const res = await $fetch('/api/token', {
         method: 'POST',
-        body: { projectId: route.params.id, uid: user.value.uid, forceRefresh: force },
+        body: {
+          projectId: route.params.id,
+          uid: user.value.uid,
+          platforms: project.value.platforms,
+        },
       })
 
       chatUrl.value = `${window.location.origin}/chatview?token=${res.token}`

@@ -1,10 +1,12 @@
+// app/middleware/auth.global.js
 export default defineNuxtRouteMiddleware((to) => {
-  // ✅ Skip middleware entirely for server and API routes
-  if (process.server || to.path.startsWith('/api')) return
+  // ✅ Skip during SSR rendering or when navigating to API-like paths
+  if (import.meta.server || to.path.startsWith('/api')) return
 
   const { user, role } = useAuthState()
 
-  const publicPaths = ['/', '/no-access']
+  // 👇 include chatview here
+  const publicPaths = ['/', '/no-access', '/chatview']
   const isPublic = publicPaths.includes(to.path)
 
   // 🚫 Not logged in → redirect to /
