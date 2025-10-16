@@ -1,5 +1,5 @@
 // app/plugins/firebase.client.js
-import { initializeApp } from 'firebase/app'
+import { getApp, getApps, initializeApp } from 'firebase/app'
 import { GoogleAuthProvider, getAuth } from 'firebase/auth'
 
 export default defineNuxtPlugin(() => {
@@ -12,9 +12,15 @@ export default defineNuxtPlugin(() => {
     appId: import.meta.env.VITE_FIREBASE_APP_ID,
   }
 
-  const app = initializeApp(firebaseConfig)
+  // ✅ Prevent duplicate initialization
+  const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
+
   const auth = getAuth(app)
   const provider = new GoogleAuthProvider()
 
-  return { provide: { firebase: app, auth, provider } }
+  console.info('[Firebase] Initialized app:', app.name)
+
+  return {
+    provide: { firebase: app, auth, provider },
+  }
 })

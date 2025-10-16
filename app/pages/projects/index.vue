@@ -1,73 +1,83 @@
 <template>
   <div class="pa-4">
-    <div class="pb-4">
-      <v-toolbar>
-        <v-toolbar-title text="Projects"></v-toolbar-title>
-        <template v-slot:append>
-          <v-btn icon="mdi-plus"></v-btn>
-        </template>
-      </v-toolbar>
-    </div>
+    <v-chip v-if="role === 'pending'" color="warning">Waiting for Admin to give you access.</v-chip>
+    <div v-if="role === 'admin'">
+      <div class="pb-4">
+        <v-toolbar>
+          <v-toolbar-title text="Projects"></v-toolbar-title>
+          <template v-slot:append>
+            <v-btn icon="mdi-plus"></v-btn>
+          </template>
+        </v-toolbar>
+      </div>
 
-    <div class="d-flex ga-4">
-      <v-card
-        elevation="16"
-        variant="tonal"
-        width="350"
-        class="d-flex flex-column justify-space-between"
-      >
-        <v-card-title>Samsung Hangout</v-card-title>
-        <v-card-text>
-          <v-icon color="red">mdi-youtube</v-icon> SamsungNederland
-          <v-chip color="success">connected <span class="status-dot"></span></v-chip><br />
-          <v-icon color="red">mdi-youtube</v-icon> SamsungBelgium
-          <v-chip color="success">connected <span class="status-dot"></span></v-chip><br />
-          <v-icon>mdi-alpha-t</v-icon> SamsungNederland <v-chip color="error">disconnected</v-chip
-          ><br />
-          <v-icon>mdi-alpha-t</v-icon> SamsungBelgium
-          <v-chip color="error">disconnected</v-chip>
-        </v-card-text>
-        <v-card-actions class="mt-auto">
-          <v-btn
-            append-icon="mdi-chevron-right"
-            color="primary"
-            text="Open project"
-            variant="outlined"
-            block
-          ></v-btn>
-        </v-card-actions>
-      </v-card>
+      <div class="d-flex ga-4">
+        <v-card
+          elevation="16"
+          variant="tonal"
+          width="350"
+          class="d-flex flex-column justify-space-between"
+        >
+          <v-card-title>Samsung Hangout</v-card-title>
+          <v-card-text>
+            <v-icon color="red">mdi-youtube</v-icon> SamsungNederland
+            <v-chip color="success">connected <span class="status-dot"></span></v-chip><br />
+            <v-icon color="red">mdi-youtube</v-icon> SamsungBelgium
+            <v-chip color="success">connected <span class="status-dot"></span></v-chip><br />
+            <v-icon>mdi-alpha-t</v-icon> SamsungNederland <v-chip color="error">disconnected</v-chip
+            ><br />
+            <v-icon>mdi-alpha-t</v-icon> SamsungBelgium
+            <v-chip color="error">disconnected</v-chip>
+          </v-card-text>
+          <v-card-actions class="mt-auto">
+            <v-btn
+              append-icon="mdi-chevron-right"
+              color="primary"
+              text="Open project"
+              variant="outlined"
+              block
+            ></v-btn>
+          </v-card-actions>
+        </v-card>
 
-      <v-card
-        elevation="16"
-        variant="tonal"
-        width="350"
-        class="d-flex flex-column justify-space-between"
-      >
-        <v-card-title>HEMA</v-card-title>
-        <v-card-text>
-          <v-icon color="red">mdi-youtube</v-icon> Hema
-          <v-chip color="success">connected <span class="status-dot"></span></v-chip><br />
-          <v-icon>mdi-alpha-t</v-icon> Hema
-          <v-chip color="success">connected <span class="status-dot"></span></v-chip><br />
-          <v-icon color="purple">mdi-instagram</v-icon> Hema
-          <v-chip color="error">disconnected</v-chip>
-        </v-card-text>
-        <v-card-actions class="mt-auto">
-          <v-btn
-            append-icon="mdi-chevron-right"
-            color="primary"
-            text="Open project"
-            variant="outlined"
-            block
-          ></v-btn>
-        </v-card-actions>
-      </v-card>
+        <v-card
+          elevation="16"
+          variant="tonal"
+          width="350"
+          class="d-flex flex-column justify-space-between"
+        >
+          <v-card-title>HEMA</v-card-title>
+          <v-card-text>
+            <v-icon color="red">mdi-youtube</v-icon> Hema
+            <v-chip color="success">connected <span class="status-dot"></span></v-chip><br />
+            <v-icon>mdi-alpha-t</v-icon> Hema
+            <v-chip color="success">connected <span class="status-dot"></span></v-chip><br />
+            <v-icon color="purple">mdi-instagram</v-icon> Hema
+            <v-chip color="error">disconnected</v-chip>
+          </v-card-text>
+          <v-card-actions class="mt-auto">
+            <v-btn
+              append-icon="mdi-chevron-right"
+              color="primary"
+              text="Open project"
+              variant="outlined"
+              block
+            ></v-btn>
+          </v-card-actions>
+        </v-card>
+      </div>
     </div>
   </div>
 </template>
 
-<script lang="ts" setup></script>
+<script>
+export default {
+  setup() {
+    const { role } = useAuthState()
+    return { role }
+  },
+}
+</script>
 
 <style scoped>
 .status-dot {

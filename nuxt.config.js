@@ -17,7 +17,6 @@ export default defineNuxtConfig({
       ignore: ['/login', '/dashboard', '/auth'],
     },
   },
-
   vite: {
     ssr: {
       noExternal: ['vuetify'],
@@ -26,5 +25,9 @@ export default defineNuxtConfig({
   },
   imports: {
     dirs: ['app/composables', 'app/middleware'],
+  },
+  modules: ['@pinia/nuxt'],
+  pinia: {
+    autoImports: ['defineStore', 'storeToRefs'],
   },
 })

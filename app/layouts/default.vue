@@ -8,9 +8,25 @@
       <v-divider></v-divider>
 
       <v-list density="compact" nav>
-        <v-list-item prepend-icon="mdi-folder" title="Projects" value="projects" to="/projects" />
-        <v-list-item prepend-icon="mdi-account-multiple" title="Users" value="users" />
-        <v-list-item prepend-icon="mdi-cog" title="Settings" value="settings" />
+        <v-list-item
+          v-if="role === 'admin'"
+          prepend-icon="mdi-folder"
+          title="Projects"
+          value="projects"
+          to="/projects"
+        />
+        <v-list-item
+          v-if="role === 'admin'"
+          prepend-icon="mdi-account-multiple"
+          title="Users"
+          value="users"
+        />
+        <v-list-item
+          v-if="role === 'admin'"
+          prepend-icon="mdi-cog"
+          title="Settings"
+          value="settings"
+        />
       </v-list>
 
       <!-- Logout section anchored at bottom -->
@@ -21,6 +37,12 @@
             v-if="user"
             prepend-icon="mdi-account"
             :title="`${user.email || user.displayName}`"
+          />
+          <v-list-item
+            v-if="role === 'admin'"
+            prepend-icon="mdi-shield-account"
+            title="Admin Panel"
+            to="/admin/users"
           />
           <v-list-item v-if="user" prepend-icon="mdi-logout" title="Logout" @click="logout" />
         </v-list>
@@ -40,7 +62,7 @@ import { signOut } from 'firebase/auth'
 export default {
   setup() {
     const { $auth } = useNuxtApp()
-    const { user } = useAuthState()
+    const { user, role } = useAuthState() // 👈 include role here
     const router = useRouter()
 
     const logout = async () => {
@@ -54,7 +76,7 @@ export default {
       }
     }
 
-    return { user, logout }
+    return { user, role, logout } // 👈 return role too
   },
 }
 </script>
