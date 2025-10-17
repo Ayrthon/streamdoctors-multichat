@@ -4,7 +4,7 @@
       <img class="pa-5" src="/images/cropped-streamdoctors-logo_wit.png" width="240" />
       <div class="mt-2">MultiChat v1.2</div>
     </v-app-bar>
-    <v-navigation-drawer expand-on-hover permanent rail>
+    <v-navigation-drawer expand-on-hover rail>
       <v-divider></v-divider>
 
       <v-list density="compact" nav>
@@ -15,7 +15,7 @@
           value="projects"
           to="/projects"
         />
-        <v-list-item
+        <!-- <v-list-item
           v-if="role === 'admin'"
           prepend-icon="mdi-account-multiple"
           title="Users"
@@ -26,7 +26,7 @@
           prepend-icon="mdi-cog"
           title="Settings"
           value="settings"
-        />
+        /> -->
       </v-list>
 
       <!-- Logout section anchored at bottom -->
@@ -44,7 +44,13 @@
             title="Admin Panel"
             to="/admin/users"
           />
-          <v-list-item v-if="user" prepend-icon="mdi-logout" title="Logout" @click="logout" />
+          <v-list-item
+            v-if="user"
+            prepend-icon="mdi-logout"
+            title="Logout"
+            class="text-error"
+            @click="logout"
+          />
         </v-list>
       </template>
     </v-navigation-drawer>
@@ -53,31 +59,42 @@
       <NuxtPage />
     </v-main>
     <v-main class="d-flex align-center justify-center"></v-main>
+
+    <v-snackbar
+      v-model="snackbar.show"
+      :color="snackbar.color"
+      location="bottom right"
+      timeout="2500"
+      elevation="24"
+    >
+      {{ snackbar.text }}
+    </v-snackbar>
   </v-layout>
 </template>
 
-<script>
+<script setup>
 import { signOut } from 'firebase/auth'
+import { useAuthState } from '~/composables/useAuthState'
+import { useSnackbar } from '~/composables/useSnackbar'
 
-export default {
-  setup() {
-    const { $auth } = useNuxtApp()
-    const { user, role } = useAuthState() // 👈 include role here
-    const router = useRouter()
+const { snackbar } = useSnackbar() // ✅ must be inside <script setup>
+const { $auth } = useNuxtApp()
+const { user, role } = useAuthState()
+const router = useRouter()
 
-    const logout = async () => {
-      try {
-        await signOut($auth)
-        user.value = null
-        router.push('/')
-      } catch (error) {
-        console.error('Logout failed:', error)
-        alert('Error logging out.')
-      }
+const logout = async () => {
+  try {
+    await signOut($auth)
+    user.value = null
+    router.push('/')
+  } catch (error) {
+    console.error('Logout failed:', error)
+    snackbar.value = {
+      show: true,
+      text: 'Error logging out',
+      color: 'error',
     }
-
-    return { user, role, logout } // 👈 return role too
-  },
+  }
 }
 </script>
 

@@ -56,9 +56,9 @@
 
                 {{ platform.username }}
 
-                <v-chip size="small" :color="platform.connected ? 'success' : 'error'" class="ml-1">
+                <!-- <v-chip size="small" :color="platform.connected ? 'success' : 'error'" class="ml-1">
                   {{ platform.connected ? 'connected' : 'disconnected' }}
-                </v-chip>
+                </v-chip> -->
               </div>
             </div>
           </v-card-text>
