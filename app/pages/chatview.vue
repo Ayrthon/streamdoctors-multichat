@@ -35,38 +35,28 @@ import { useRoute } from 'vue-router'
 
 import tmi from 'tmi.js'
 
-// --- ICON + FLAG helpers ---
-const platformIcons = {
-  twitch: 'mdi-twitch',
-  youtube: 'mdi-youtube',
-  instagram: 'mdi-instagram',
-}
-
-const platformColor = (platform) => {
-  switch (platform) {
-    case 'twitch':
-      return 'text-purple'
-    case 'youtube':
-      return 'text-red'
-    case 'instagram':
-      return 'text-pink'
-    default:
-      return ''
-  }
-}
-
-function countryFlag(code) {
-  if (!code) return ''
-  return code
-    .toUpperCase()
-    .replace(/./g, (char) => String.fromCodePoint(127397 + char.charCodeAt(0)))
-}
-
 definePageMeta({
   layout: false,
 })
 
 const route = useRoute()
+
+// 🔑 Get token from URL query
+const token = computed(() => route.query.token)
+
+// 🧠 Fetch project data from our new endpoint
+const {
+  data,
+  pending,
+  error: fetchError,
+} = await useFetch(
+  () => (token.value ? `/api/chatview?token=${encodeURIComponent(token.value)}` : null),
+  { key: () => `chatview:${token.value || 'none'}` }
+)
+
+if (!token.value) console.warn('[chatview] Missing ?token=')
+
+// Local state
 const projectId = ref(null)
 const platforms = ref([])
 const error = ref(null)
@@ -92,6 +82,33 @@ function getUserColor(username) {
   const color = colors[hash % colors.length]
   userColorCache.set(username, color)
   return color
+}
+
+// --- ICON + FLAG helpers ---
+const platformIcons = {
+  twitch: 'mdi-twitch',
+  youtube: 'mdi-youtube',
+  instagram: 'mdi-instagram',
+}
+
+const platformColor = (platform) => {
+  switch (platform) {
+    case 'twitch':
+      return 'text-purple'
+    case 'youtube':
+      return 'text-red'
+    case 'instagram':
+      return 'text-pink'
+    default:
+      return ''
+  }
+}
+
+function countryFlag(code) {
+  if (!code) return ''
+  return code
+    .toUpperCase()
+    .replace(/./g, (char) => String.fromCodePoint(127397 + char.charCodeAt(0)))
 }
 
 // 🧩 Helper: Get YouTube live video ID
@@ -136,142 +153,129 @@ function connectYouTubeSSE(liveVideoId, account) {
   onBeforeUnmount(() => source.close())
 }
 
-// 🔥 Reactive watcher: connect platforms once loaded
-watch(
-  platforms,
-  async (list) => {
-    if (import.meta.server) return
-    if (!list?.length) return
+// 🔥 Connect platforms when data loads
+watchEffect(async () => {
+  if (import.meta.server) return
+  if (!data.value?.platforms?.length) return
 
-    // 🟣 Twitch
-    const twitchAccounts = list
-      .filter((p) => p.type === 'twitch')
-      .map((p) => p.username.toLowerCase())
+  platforms.value = data.value.platforms
 
-    if (twitchAccounts.length) {
-      const client = new tmi.Client({
-        options: { debug: true },
-        connection: { reconnect: true },
-        channels: twitchAccounts,
+  // 🟣 Twitch
+  const twitchAccounts = platforms.value
+    .filter((p) => p.type === 'twitch')
+    .map((p) => p.username.toLowerCase())
+
+  if (twitchAccounts.length) {
+    const client = new tmi.Client({
+      options: { debug: true },
+      connection: { reconnect: true },
+      channels: twitchAccounts,
+    })
+
+    client.connect()
+
+    function parseTwitchEmotes(message, emotes) {
+      if (!emotes) return escapeHtml(message)
+      const replacements = []
+      Object.entries(emotes).forEach(([id, positions]) => {
+        positions.forEach((pos) => {
+          const [start, end] = pos.split('-').map(Number)
+          const code = message.substring(start, end + 1)
+          replacements.push({ start, end, id, code })
+        })
+      })
+      replacements.sort((a, b) => b.start - a.start)
+      let result = message
+      for (const { start, end, id, code } of replacements) {
+        const img = `<img src="https://static-cdn.jtvnw.net/emoticons/v2/${id}/default/dark/1.0" alt="${code}" class="emote" />`
+        result = result.slice(0, start) + img + result.slice(end + 1)
+      }
+      return result
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+    }
+
+    client.on('message', (channel, tags, message, self) => {
+      if (self) return
+      const html = parseTwitchEmotes(message, tags.emotes)
+      const platformData = platforms.value.find(
+        (p) =>
+          p.type === 'twitch' && p.username.toLowerCase() === channel.replace('#', '').toLowerCase()
+      )
+      const country = platformData?.country || ''
+      const color = tags.color || getUserColor(tags.username)
+
+      messages.value.push({
+        platform: 'twitch',
+        country,
+        channel,
+        user: tags['display-name'] || tags.username,
+        color,
+        html,
+        timestamp: Date.now(),
       })
 
-      client.connect()
+      if (messages.value.length > 100) messages.value.shift()
+    })
 
-      function parseTwitchEmotes(message, emotes) {
-        if (!emotes) return escapeHtml(message)
-        const replacements = []
-        Object.entries(emotes).forEach(([id, positions]) => {
-          positions.forEach((pos) => {
-            const [start, end] = pos.split('-').map(Number)
-            const code = message.substring(start, end + 1)
-            replacements.push({ start, end, id, code })
-          })
-        })
-        replacements.sort((a, b) => b.start - a.start)
-        let result = message
-        for (const { start, end, id, code } of replacements) {
-          const img = `<img src="https://static-cdn.jtvnw.net/emoticons/v2/${id}/default/dark/1.0" alt="${code}" class="emote" />`
-          result = result.slice(0, start) + img + result.slice(end + 1)
-        }
-        return result
-      }
+    onBeforeUnmount(() => client.disconnect())
+  }
 
-      function escapeHtml(str) {
-        return str
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&#039;')
-      }
+  // 🔴 YouTube
+  const youtubeAccounts = platforms.value.filter((p) => p.type === 'youtube')
+  for (const account of youtubeAccounts) {
+    const liveId = await getLiveId(account.username)
+    if (!liveId) continue
+    console.log(`✅ Connecting YouTube SSE for ${account.username}`)
+    connectYouTubeSSE(liveId, account)
+  }
 
-      client.on('message', (channel, tags, message, self) => {
-        if (self) return
-        const html = parseTwitchEmotes(message, tags.emotes)
-        const platformData = platforms.value.find(
-          (p) =>
-            p.type === 'twitch' &&
-            p.username.toLowerCase() === channel.replace('#', '').toLowerCase()
-        )
-        const country = platformData?.country || ''
-        const color = tags.color || getUserColor(tags.username)
+  // 🖤 TikTok
+  const tiktokAccounts = platforms.value.filter((p) => p.type === 'tiktok')
+  if (tiktokAccounts.length) {
+    for (const account of tiktokAccounts) {
+      const username = account.username.toLowerCase()
+      const source = new EventSource(`/api/tiktok-chat/${username}/sse`)
 
+      source.onmessage = (e) => {
+        const msg = JSON.parse(e.data)
         messages.value.push({
-          platform: 'twitch',
-          country,
-          channel,
-          user: tags['display-name'] || tags.username,
-          color,
-          html,
-          timestamp: Date.now(),
+          platform: 'tiktok',
+          country: account.country || '',
+          user: msg.user,
+          html: msg.message,
+          color: msg.color,
+          timestamp: msg.timestamp,
         })
-
         if (messages.value.length > 100) messages.value.shift()
+      }
+
+      source.onerror = (err) => {
+        console.warn('TikTok SSE error:', err)
+        source.close()
+        setTimeout(() => {
+          const newSource = new EventSource(`/api/tiktok-chat/${username}/sse`)
+        }, 5000)
+      }
+
+      source.addEventListener('end', () => {
+        console.log(`TikTok chat stream ended for ${username}`)
+        source.close()
       })
 
-      onBeforeUnmount(() => client.disconnect())
+      onBeforeUnmount(() => source.close())
     }
-
-    // 🔴 YouTube
-    const youtubeAccounts = list.filter((p) => p.type === 'youtube')
-    for (const account of youtubeAccounts) {
-      const liveId = await getLiveId(account.username)
-      if (!liveId) continue
-      console.log(`✅ Connecting YouTube SSE for ${account.username}`)
-      connectYouTubeSSE(liveId, account)
-    }
-
-    // 🖤 TikTok setup
-    const tiktokAccounts = list.filter((p) => p.type === 'tiktok')
-    if (tiktokAccounts.length) {
-      for (const account of tiktokAccounts) {
-        const username = account.username.toLowerCase()
-        const source = new EventSource(`/api/tiktok-chat/${username}/sse`)
-
-        source.onmessage = (e) => {
-          const msg = JSON.parse(e.data)
-          messages.value.push({
-            platform: 'tiktok',
-            country: account.country || '',
-            user: msg.user,
-            html: msg.message,
-            color: msg.color,
-            timestamp: msg.timestamp,
-          })
-          if (messages.value.length > 100) messages.value.shift()
-        }
-
-        source.onerror = (err) => {
-          console.warn('TikTok SSE error:', err)
-          source.close()
-          // 🔁 Auto-reconnect after 5 seconds
-          setTimeout(() => {
-            const newSource = new EventSource(`/api/tiktok-chat/${username}/sse`)
-          }, 5000)
-        }
-
-        source.addEventListener('end', () => {
-          console.log(`TikTok chat stream ended for ${username}`)
-          source.close()
-        })
-
-        onBeforeUnmount(() => source.close())
-      }
-    }
-  },
-  { immediate: true }
-)
-
-// 🔐 Verify token → load project platforms
-onMounted(async () => {
-  try {
-    const res = await $fetch('/api/verify', { params: { token: route.query.token } })
-    projectId.value = res.projectId
-    platforms.value = res.platforms || []
-  } catch (err) {
-    error.value = err.data?.message || 'Access denied'
   }
 })
+
+// (Removed old verify endpoint)
 </script>
 
 <style scoped>

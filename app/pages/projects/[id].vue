@@ -1,8 +1,15 @@
 <template>
   <div class="pa-6" v-if="project">
     <v-toolbar flat>
-      <v-toolbar-title>{{ project.name }}</v-toolbar-title>
+      <v-text-field
+        v-model="editableProject.name"
+        label="Project Name"
+        variant="plain"
+        hide-details
+        class="text-h6 flex-grow-1"
+      />
       <template #append>
+        <v-btn color="primary" text="Save Changes" @click="saveProject" class="mr-2" />
         <v-btn color="error" text="Delete Project" @click="removeProject" />
       </template>
     </v-toolbar>
@@ -12,16 +19,21 @@
     <h3 class="mb-3">Platforms</h3>
 
     <div class="d-flex ga-4 flex-wrap">
-      <v-card v-for="(p, index) in project.platforms" :key="index" width="300" variant="tonal">
+      <v-card
+        v-for="(p, index) in editableProject.platforms"
+        :key="index"
+        width="300"
+        variant="tonal"
+        class="cursor-pointer"
+        @click="editPlatform(index)"
+      >
         <v-card-title class="d-flex align-center ga-2">
-          <!-- Custom TikTok SVG -->
           <span
             v-if="p.type === 'tiktok'"
             class="svg-icon"
             :style="{ color: iconColor('tiktok') }"
           ></span>
 
-          <!-- All other icons -->
           <v-icon v-else :color="iconColor(p.type)" class="mr-2">
             {{ iconFor(p.type) }}
           </v-icon>
@@ -30,15 +42,15 @@
         </v-card-title>
 
         <v-card-text>
-          <strong>Country:</strong> {{ p.country }} <br />
-          <strong>Username:</strong> {{ p.username }} <br />
+          <strong>Country:</strong> {{ p.country || 'N/A' }} <br />
+          <strong>Username:</strong> {{ p.username || 'N/A' }} <br />
           <v-chip :color="p.connected ? 'success' : 'error'">
             {{ p.connected ? 'connected' : 'disconnected' }}
           </v-chip>
         </v-card-text>
 
         <v-card-actions>
-          <v-btn color="error" text="Remove" @click="removePlatform(index)" />
+          <v-btn color="error" text="Remove" @click.stop="removePlatform(index)" />
         </v-card-actions>
       </v-card>
 
@@ -47,7 +59,7 @@
         variant="outlined"
         class="d-flex flex-column align-center pa-6 justify-center"
       >
-        <v-btn icon="mdi-plus" @click="dialog = true" />
+        <v-btn icon="mdi-plus" @click="openAddDialog" />
         <span class="mt-2">Add platform</span>
       </v-card>
     </div>
@@ -62,149 +74,156 @@
       @click:append-inner="copyChatUrl"
     />
 
+    <!-- Add/Edit Platform Dialog -->
     <v-dialog v-model="dialog" max-width="400">
       <v-card>
-        <v-card-title>Add Platform</v-card-title>
+        <v-card-title>{{ editingIndex !== null ? 'Edit Platform' : 'Add Platform' }}</v-card-title>
         <v-card-text>
           <v-select
             label="Platform"
-            v-model="newPlatform.type"
+            v-model="dialogPlatform.type"
             :items="['twitch', 'youtube', 'tiktok', 'instagram']"
           />
           <v-select
             label="Country"
-            v-model="newPlatform.country"
+            v-model="dialogPlatform.country"
             :items="['NL', 'BE', 'DE', 'FR', 'UK']"
           />
-          <v-text-field label="Username / ID" v-model="newPlatform.username" />
+          <v-text-field label="Username / ID" v-model="dialogPlatform.username" />
         </v-card-text>
         <v-card-actions>
-          <v-btn text="Cancel" @click="dialog = false" />
-          <v-btn color="primary" text="Add" @click="addPlatform" />
+          <v-btn text="Cancel" @click="closeDialog" />
+          <v-btn color="primary" text="Save" @click="savePlatform" />
         </v-card-actions>
       </v-card>
     </v-dialog>
   </div>
 </template>
 
-<script>
+<script setup>
+import { useAuthState } from '~/composables/useAuthState'
 import { useProjectsStore } from '~/stores/projectsStore'
 
-export default {
-  setup() {
-    const route = useRoute()
-    const router = useRouter()
-    const { user } = useAuthState()
-    const projectsStore = useProjectsStore()
-    const project = computed(() => projectsStore.currentProject)
-    const dialog = ref(false)
-    const newPlatform = ref({ type: '', country: '', username: '' })
+const route = useRoute()
+const router = useRouter()
+const { user } = useAuthState()
+const projectsStore = useProjectsStore()
 
-    const chatUrl = ref('')
-    const iconFor = (type) => {
-      switch (type) {
-        case 'twitch':
-          return 'mdi-twitch'
-        case 'youtube':
-          return 'mdi-youtube'
-        case 'tiktok':
-          return 'mdi-alpha-t'
-        case 'instagram':
-          return 'mdi-instagram'
-        default:
-          return 'mdi-earth'
-      }
-    }
+const project = computed(() => projectsStore.currentProject)
+const editableProject = ref({ name: '', platforms: [] })
+const chatUrl = ref('')
+const dialog = ref(false)
+const editingIndex = ref(null)
+const dialogPlatform = ref({ type: '', country: '', username: '' })
 
-    const iconColor = (type) => {
-      switch (type) {
-        case 'youtube':
-          return 'red'
-        case 'twitch':
-          return 'purple'
-        case 'tiktok':
-          return 'white'
-        case 'instagram':
-          return 'orange'
-        default:
-          return 'grey'
-      }
-    }
+const iconFor = (type) => {
+  switch (type) {
+    case 'twitch':
+      return 'mdi-twitch'
+    case 'youtube':
+      return 'mdi-youtube'
+    case 'tiktok':
+      return 'mdi-alpha-t'
+    case 'instagram':
+      return 'mdi-instagram'
+    default:
+      return 'mdi-earth'
+  }
+}
 
-    onMounted(async () => {
-      await projectsStore.loadProject(route.params.id)
+const iconColor = (type) => {
+  switch (type) {
+    case 'youtube':
+      return 'red'
+    case 'twitch':
+      return 'purple'
+    case 'tiktok':
+      return 'white'
+    case 'instagram':
+      return 'orange'
+    default:
+      return 'grey'
+  }
+}
 
-      if (!project.value?.platforms) {
-        await new Promise((resolve) => {
-          const unwatch = watch(
-            () => project.value?.platforms,
-            (val) => {
-              if (val) {
-                unwatch()
-                resolve()
-              }
-            },
-            { immediate: true }
-          )
-        })
-      }
+onMounted(async () => {
+  await projectsStore.loadProject(route.params.id)
 
-      // ✅ Now platforms are guaranteed to exist
-      const res = await $fetch('/api/token', {
-        method: 'POST',
-        body: {
-          projectId: route.params.id,
-          uid: user.value.uid,
-          platforms: project.value.platforms,
-        },
-      })
+  // Wait until project is loaded
+  await new Promise((resolve) => {
+    const unwatch = watch(
+      () => project.value,
+      (val) => {
+        if (val) {
+          editableProject.value = JSON.parse(JSON.stringify(val))
+          unwatch()
+          resolve()
+        }
+      },
+      { immediate: true }
+    )
+  })
 
-      chatUrl.value = `${window.location.origin}/chatview?token=${res.token}`
-    })
+  // ✅ Use existing Firestore token
+  if (project.value?.publicToken) {
+    chatUrl.value = `${window.location.origin}/chatview?token=${project.value.publicToken}`
+  }
+})
 
-    onBeforeUnmount(() => {
-      projectsStore.stop()
-    })
+onBeforeUnmount(() => {
+  projectsStore.stop()
+})
 
-    const addPlatform = async () => {
-      if (!newPlatform.value.type || !newPlatform.value.username) return
-      await projectsStore.addPlatform(route.params.id, {
-        ...newPlatform.value,
-        connected: false,
-      })
-      dialog.value = false
-      newPlatform.value = { type: '', country: '', username: '' }
-    }
+const openAddDialog = () => {
+  editingIndex.value = null
+  dialogPlatform.value = { type: '', country: '', username: '' }
+  dialog.value = true
+}
 
-    const removePlatform = async (index) => {
-      await projectsStore.removePlatform(route.params.id, index)
-    }
+const editPlatform = (index) => {
+  editingIndex.value = index
+  dialogPlatform.value = { ...editableProject.value.platforms[index] }
+  dialog.value = true
+}
 
-    const removeProject = async () => {
-      if (confirm('Delete this project?')) {
-        await projectsStore.deleteProject(route.params.id)
-        router.push('/projects')
-      }
-    }
+const savePlatform = async () => {
+  const updated = [...(editableProject.value.platforms || [])]
 
-    const copyChatUrl = () => {
-      navigator.clipboard.writeText(chatUrl.value)
-      alert('Copied to clipboard!')
-    }
+  if (editingIndex.value !== null) {
+    updated.splice(editingIndex.value, 1, { ...dialogPlatform.value })
+  } else {
+    updated.push({ ...dialogPlatform.value, connected: false })
+  }
 
-    return {
-      project,
-      dialog,
-      newPlatform,
-      iconFor,
-      iconColor,
-      chatUrl,
-      addPlatform,
-      removePlatform,
-      removeProject,
-      copyChatUrl,
-    }
-  },
+  editableProject.value.platforms = updated
+  dialog.value = false
+  editingIndex.value = null
+}
+
+const closeDialog = () => {
+  dialog.value = false
+  editingIndex.value = null
+}
+
+const removePlatform = async (index) => {
+  editableProject.value.platforms.splice(index, 1)
+}
+
+const saveProject = async () => {
+  await projectsStore.saveProject(route.params.id, editableProject.value)
+  alert('Project saved!')
+}
+
+const removeProject = async () => {
+  if (confirm('Delete this project?')) {
+    await projectsStore.deleteProject(route.params.id)
+    router.push('/projects')
+  }
+}
+
+const copyChatUrl = () => {
+  navigator.clipboard.writeText(chatUrl.value)
+  alert('Copied to clipboard!')
 }
 </script>
 

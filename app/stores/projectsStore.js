@@ -1,4 +1,3 @@
-// ~/stores/projects.js
 import {
   addDoc,
   collection,
@@ -6,11 +5,16 @@ import {
   doc,
   getDoc,
   onSnapshot,
+  orderBy,
+  query,
   serverTimestamp,
+  setDoc,
   updateDoc,
 } from 'firebase/firestore'
 import { defineStore } from 'pinia'
 import { useAuthState } from '~/composables/useAuthState'
+
+import { generatePublicToken } from '../utils/generatePublicToken'
 
 export const useProjectsStore = defineStore('projects', {
   state: () => ({
@@ -24,7 +28,7 @@ export const useProjectsStore = defineStore('projects', {
   actions: {
     async init() {
       const { user } = useAuthState()
-      const { firestore } = await useFirebase() // ✅ wait until ready
+      const { firestore } = await useFirebase()
 
       if (!firestore) {
         console.error('[ProjectsStore] Firestore failed to initialize.')
@@ -72,15 +76,30 @@ export const useProjectsStore = defineStore('projects', {
 
     async addProject(name) {
       const { user } = useAuthState()
-      const { firestore } = await useFirebase() // ✅ waits until ready
+      const { firestore } = await useFirebase()
       if (!user.value || !firestore) return
 
       const ref = collection(firestore, 'users', user.value.uid, 'projects')
-      await addDoc(ref, {
+      const token = generatePublicToken()
+
+      const newDoc = await addDoc(ref, {
         name,
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
         platforms: [],
+        publicToken: token,
       })
+
+      // ✅ Mirror it in publicProjects for chatview lookups
+      await setDoc(doc(firestore, 'publicProjects', token), {
+        uid: user.value.uid,
+        projectId: newDoc.id,
+        name,
+        platforms: [],
+        createdAt: serverTimestamp(),
+      })
+
+      console.log('[ProjectsStore] Created project', name, 'with token', token)
     },
 
     async deleteProject(id) {
@@ -88,21 +107,31 @@ export const useProjectsStore = defineStore('projects', {
       const { firestore } = await useFirebase()
       if (!user.value || !firestore) return
 
-      await deleteDoc(doc(firestore, 'users', user.value.uid, 'projects', id))
+      const projectRef = doc(firestore, 'users', user.value.uid, 'projects', id)
+      const snap = await getDoc(projectRef)
+      const project = snap.exists() ? snap.data() : null
 
-      // clean up
+      await deleteDoc(projectRef)
+
+      // 🗑️ Clean up publicProjects mirror
+      if (project?.publicToken) {
+        await deleteDoc(doc(firestore, 'publicProjects', project.publicToken))
+      }
+
       this.currentProject = null
       if (this.unsubscribeProject) {
         this.unsubscribeProject()
         this.unsubscribeProject = null
       }
+
+      console.log('[ProjectsStore] Deleted project', id)
     },
+
     async loadProject(id) {
       const { user } = useAuthState()
       const { firestore } = await useFirebase()
       if (!user.value || !firestore) return
 
-      // Stop any previous listener to avoid duplicates
       if (this.unsubscribeProject) {
         this.unsubscribeProject()
         this.unsubscribeProject = null
@@ -112,7 +141,6 @@ export const useProjectsStore = defineStore('projects', {
         const projectRef = doc(firestore, 'users', user.value.uid, 'projects', id)
         this.loading = true
 
-        // 👇 Listen live to changes
         this.unsubscribeProject = onSnapshot(projectRef, (snap) => {
           if (snap.exists()) {
             this.currentProject = { id: snap.id, ...snap.data() }
@@ -136,13 +164,21 @@ export const useProjectsStore = defineStore('projects', {
 
       const projectRef = doc(firestore, 'users', user.value.uid, 'projects', projectId)
       const snap = await getDoc(projectRef)
-
       if (!snap.exists()) return console.error('Project not found')
+
       const project = snap.data()
       const updatedPlatforms = [...(project.platforms || []), platform]
 
       await updateDoc(projectRef, { platforms: updatedPlatforms })
       console.log('[ProjectsStore] Added platform to', project.name)
+
+      // ✅ Update public mirror
+      if (project.publicToken) {
+        await updateDoc(doc(firestore, 'publicProjects', project.publicToken), {
+          platforms: updatedPlatforms,
+          updatedAt: serverTimestamp(),
+        })
+      }
     },
 
     async removePlatform(projectId, index) {
@@ -152,14 +188,48 @@ export const useProjectsStore = defineStore('projects', {
 
       const projectRef = doc(firestore, 'users', user.value.uid, 'projects', projectId)
       const snap = await getDoc(projectRef)
-
       if (!snap.exists()) return console.error('Project not found')
+
       const project = snap.data()
       const updatedPlatforms = [...(project.platforms || [])]
       updatedPlatforms.splice(index, 1)
 
       await updateDoc(projectRef, { platforms: updatedPlatforms })
       console.log('[ProjectsStore] Removed platform from', project.name)
+
+      // ✅ Sync publicProjects mirror
+      if (project.publicToken) {
+        await updateDoc(doc(firestore, 'publicProjects', project.publicToken), {
+          platforms: updatedPlatforms,
+          updatedAt: serverTimestamp(),
+        })
+      }
+    },
+
+    async saveProject(id, data) {
+      const { user } = useAuthState()
+      const { firestore } = await useFirebase()
+      if (!user.value || !firestore) return
+
+      const projectRef = doc(firestore, 'users', user.value.uid, 'projects', id)
+      const snap = await getDoc(projectRef)
+      if (!snap.exists()) throw new Error('Project not found')
+
+      const safeData = { ...data }
+      delete safeData.publicToken // never overwrite token
+
+      await updateDoc(projectRef, {
+        ...safeData,
+        updatedAt: serverTimestamp(),
+      })
+
+      const project = snap.data()
+      if (project.publicToken) {
+        await updateDoc(doc(firestore, 'publicProjects', project.publicToken), {
+          ...safeData,
+          updatedAt: serverTimestamp(),
+        })
+      }
     },
   },
 })
