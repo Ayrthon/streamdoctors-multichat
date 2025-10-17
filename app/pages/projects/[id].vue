@@ -108,7 +108,7 @@
             v-model="dialogPlatform.country"
             :items="['NL', 'BE', 'DE', 'FR', 'UK']"
           />
-          <v-text-field label="Username / ID" v-model="dialogPlatform.username" />
+          <v-text-field label="Channel Name" v-model="dialogPlatform.username" />
         </v-card-text>
 
         <v-card-actions class="justify-end">
