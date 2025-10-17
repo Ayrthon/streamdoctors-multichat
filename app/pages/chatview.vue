@@ -1,7 +1,7 @@
 <template>
   <div class="chat-overlay">
     <div v-for="(msg, i) in messages" :key="i" class="chat-line d-flex align-center ga-2">
-      <!-- Only render the generic icon if we actually have one -->
+      <!-- Generic platform icon -->
       <v-icon
         v-if="msg.platform && platformIcons[msg.platform]"
         :icon="platformIcons[msg.platform]"
@@ -9,7 +9,7 @@
         size="20"
       />
 
-      <!-- TikTok custom icon -->
+      <!-- TikTok custom icon (fallback) -->
       <img
         v-else-if="msg.platform === 'tiktok'"
         src="assets/icons/tiktok.svg"
@@ -20,11 +20,9 @@
       <!-- Country flag -->
       <span v-if="msg.country" class="flag">{{ countryFlag(msg.country) }}</span>
 
-      <!-- Username -->
+      <!-- Username + message -->
       <strong :style="{ color: msg.color }">{{ msg.user }}</strong
       >:
-
-      <!-- Message -->
       <span v-html="msg.html"></span>
     </div>
   </div>
@@ -35,16 +33,14 @@ import { useRoute } from 'vue-router'
 
 import tmi from 'tmi.js'
 
-definePageMeta({
-  layout: false,
-})
+definePageMeta({ layout: false })
 
 const route = useRoute()
 
-// 🔑 Get token from URL query
+// 🔑 Token from URL
 const token = computed(() => route.query.token)
 
-// 🧠 Fetch project data from our new endpoint
+// 🧠 Fetch project data
 const {
   data,
   pending,
@@ -56,13 +52,11 @@ const {
 
 if (!token.value) console.warn('[chatview] Missing ?token=')
 
-// Local state
 const projectId = ref(null)
 const platforms = ref([])
-const error = ref(null)
 const messages = ref([])
 
-// 🎨 Username color fallback
+// 🎨 Username color generator
 const userColorCache = new Map()
 function getUserColor(username) {
   if (userColorCache.has(username)) return userColorCache.get(username)
@@ -89,6 +83,7 @@ const platformIcons = {
   twitch: 'mdi-twitch',
   youtube: 'mdi-youtube',
   instagram: 'mdi-instagram',
+  tiktok: 'mdi-alpha-t',
 }
 
 const platformColor = (platform) => {
@@ -99,6 +94,8 @@ const platformColor = (platform) => {
       return 'text-red'
     case 'instagram':
       return 'text-pink'
+    case 'tiktok':
+      return 'text-cyan'
     default:
       return ''
   }
@@ -111,7 +108,7 @@ function countryFlag(code) {
     .replace(/./g, (char) => String.fromCodePoint(127397 + char.charCodeAt(0)))
 }
 
-// 🧩 Helper: Get YouTube live video ID
+// 🧩 YouTube live helper
 async function getLiveId(channelHandle) {
   try {
     const res = await $fetch('/api/youtube-liveid', { params: { handle: channelHandle } })
@@ -124,7 +121,7 @@ async function getLiveId(channelHandle) {
   }
 }
 
-// 🧩 Helper: Connect to YouTube chat via backend SSE
+// 🧩 Connect YouTube SSE
 function connectYouTubeSSE(liveVideoId, account) {
   const source = new EventSource(`/api/youtube-chat/${liveVideoId}`)
 
@@ -146,19 +143,18 @@ function connectYouTubeSSE(liveVideoId, account) {
     source.close()
   })
 
-  source.addEventListener('error', (e) => {
-    console.warn('YouTube SSE error', e)
-  })
+  source.onerror = (e) => console.warn('YouTube SSE error', e)
 
   onBeforeUnmount(() => source.close())
 }
 
-// 🔥 Connect platforms when data loads
+// 🔥 Connect all platforms
 watchEffect(async () => {
   if (import.meta.server) return
   if (!data.value?.platforms?.length) return
 
   platforms.value = data.value.platforms
+  const sources = [] // store all EventSources for cleanup
 
   // 🟣 Twitch
   const twitchAccounts = platforms.value
@@ -167,11 +163,10 @@ watchEffect(async () => {
 
   if (twitchAccounts.length) {
     const client = new tmi.Client({
-      options: { debug: true },
+      options: { debug: false },
       connection: { reconnect: true },
       channels: twitchAccounts,
     })
-
     client.connect()
 
     function parseTwitchEmotes(message, emotes) {
@@ -239,11 +234,11 @@ watchEffect(async () => {
 
   // 🖤 TikTok
   const tiktokAccounts = platforms.value.filter((p) => p.type === 'tiktok')
-  if (tiktokAccounts.length) {
-    for (const account of tiktokAccounts) {
-      const username = account.username.toLowerCase()
-      const source = new EventSource(`/api/tiktok-chat/${username}/sse`)
+  for (const account of tiktokAccounts) {
+    const username = account.username.toLowerCase()
+    let source = new EventSource(`/api/tiktok-chat/${username}/sse`)
 
+    const setupTikTokSource = () => {
       source.onmessage = (e) => {
         const msg = JSON.parse(e.data)
         messages.value.push({
@@ -257,11 +252,12 @@ watchEffect(async () => {
         if (messages.value.length > 100) messages.value.shift()
       }
 
-      source.onerror = (err) => {
-        console.warn('TikTok SSE error:', err)
+      source.onerror = () => {
+        console.warn(`TikTok SSE error for ${username}, retrying in 5s...`)
         source.close()
         setTimeout(() => {
-          const newSource = new EventSource(`/api/tiktok-chat/${username}/sse`)
+          source = new EventSource(`/api/tiktok-chat/${username}/sse`)
+          setupTikTokSource()
         }, 5000)
       }
 
@@ -269,13 +265,16 @@ watchEffect(async () => {
         console.log(`TikTok chat stream ended for ${username}`)
         source.close()
       })
-
-      onBeforeUnmount(() => source.close())
     }
-  }
-})
 
-// (Removed old verify endpoint)
+    setupTikTokSource()
+    sources.push(source)
+  }
+
+  onBeforeUnmount(() => {
+    sources.forEach((s) => s.close())
+  })
+})
 </script>
 
 <style scoped>
@@ -284,31 +283,26 @@ watchEffect(async () => {
   inset: 0;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end; /* ✅ ensures chat container sits at bottom */
+  justify-content: flex-end;
   background: transparent;
   color: white;
   padding: 1rem;
   font-family: sans-serif;
   height: 100vh;
   pointer-events: none;
-}
-
-.chat-messages {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 0.25rem;
-  width: 100%;
-  padding-bottom: 0.5rem;
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
 }
 
 .chat-line {
-  text-shadow: 0 0 4px black;
   font-size: 2rem;
   line-height: 1.3;
   opacity: 0.9;
-  animation: fade-in 0.3s ease;
+  animation: fade-in 0.3s ease forwards;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
+
 .emote {
   vertical-align: middle;
   height: 1.5em;
@@ -318,24 +312,24 @@ watchEffect(async () => {
   font-size: 1.1rem;
   line-height: 1;
 }
-.chat-line strong {
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
-}
 .text-purple {
-  color: #9146ff !important; /* Twitch purple */
+  color: #9146ff !important;
 }
 .text-red {
-  color: #ff0000 !important; /* YouTube red */
+  color: #ff0000 !important;
 }
 .text-pink {
-  color: #ff009d !important; /* Kick green */
+  color: #ff009d !important;
+}
+.text-cyan {
+  color: #00f2ea !important;
 }
 
 .icon-svg {
   width: 0.5em;
   height: 0.5em;
   vertical-align: middle;
-  filter: brightness(0) invert(1); /* turns black SVG white */
+  filter: brightness(0) invert(1);
 }
 
 @keyframes fade-in {
@@ -347,9 +341,6 @@ watchEffect(async () => {
     opacity: 0.9;
     transform: translateY(0);
   }
-}
-.error {
-  color: red;
 }
 
 :global(html),
