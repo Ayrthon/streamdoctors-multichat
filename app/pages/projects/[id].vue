@@ -111,10 +111,16 @@ const projectsStore = useProjectsStore()
 
 const project = computed(() => projectsStore.currentProject)
 const editableProject = ref({ name: '', platforms: [] })
-const chatUrl = ref('')
+
 const dialog = ref(false)
 const editingIndex = ref(null)
 const dialogPlatform = ref({ type: '', country: '', username: '' })
+
+// ✅ Computed Chat URL — always reactive
+const chatUrl = computed(() => {
+  if (!project.value?.publicToken) return ''
+  return `${window.location.origin}/chatview?token=${project.value.publicToken}`
+})
 
 const iconFor = (type) => {
   switch (type) {
@@ -149,25 +155,14 @@ const iconColor = (type) => {
 onMounted(async () => {
   await projectsStore.loadProject(route.params.id)
 
-  // Wait until project is loaded
-  await new Promise((resolve) => {
-    const unwatch = watch(
-      () => project.value,
-      (val) => {
-        if (val) {
-          editableProject.value = JSON.parse(JSON.stringify(val))
-          unwatch()
-          resolve()
-        }
-      },
-      { immediate: true }
-    )
-  })
-
-  // ✅ Use existing Firestore token
-  if (project.value?.publicToken) {
-    chatUrl.value = `${window.location.origin}/chatview?token=${project.value.publicToken}`
-  }
+  // Ensure editable copy updates when Firestore data arrives
+  watch(
+    () => project.value,
+    (val) => {
+      if (val) editableProject.value = JSON.parse(JSON.stringify(val))
+    },
+    { immediate: true }
+  )
 })
 
 onBeforeUnmount(() => {
@@ -222,6 +217,7 @@ const removeProject = async () => {
 }
 
 const copyChatUrl = () => {
+  if (!chatUrl.value) return
   navigator.clipboard.writeText(chatUrl.value)
   alert('Copied to clipboard!')
 }
