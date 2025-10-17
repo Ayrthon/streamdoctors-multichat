@@ -20,6 +20,9 @@ export default defineNuxtPlugin((nuxtApp) => {
   const firestore = getFirestore(app)
   const provider = new GoogleAuthProvider()
 
+  // 👇 Force account chooser every time
+  provider.setCustomParameters({ prompt: 'select_account' })
+
   console.log('✅ Firebase plugin initialized in Nuxt:', { app, auth, firestore })
 
   // ✅ Provide globally to all composables/stores
