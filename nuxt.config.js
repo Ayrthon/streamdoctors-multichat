@@ -10,7 +10,7 @@ export default defineNuxtConfig({
     transpile: ['vuetify'],
   },
   nitro: {
-    preset: 'node',
+    preset: 'static',
     prerender: {
       crawlLinks: false,
       routes: ['/', '/200.html', '/404.html'],
