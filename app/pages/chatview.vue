@@ -239,7 +239,7 @@ watchEffect(async () => {
   const tiktokAccounts = platforms.value.filter((p) => p.type === 'tiktok')
   for (const account of tiktokAccounts) {
     const username = account.username.toLowerCase()
-    let source = new EventSource(`https://tiktok-relay.onrender.com/tiktok/${username}/sse`)
+    let source = new EventSource(`/api/tiktok-chat/${username}/sse`)
 
     const setupTikTokSource = () => {
       // 🧠 Local deduplication cache (per platform)
@@ -276,7 +276,7 @@ watchEffect(async () => {
         console.warn(`TikTok SSE error for ${username}, retrying in 5s...`)
         source.close()
         setTimeout(() => {
-          source = new EventSource(`https://tiktok-relay.onrender.com/tiktok/${username}/sse`)
+          source = new EventSource(`/api/tiktok-chat/${username}/sse`)
           setupTikTokSource()
         }, 5000)
       }
