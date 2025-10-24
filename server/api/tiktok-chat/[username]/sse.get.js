@@ -151,31 +151,25 @@ export default defineEventHandler(async (event) => {
       shared.clients.add(controller)
       console.log(`👤 Client connected to @${cleanUsername} (${shared.clients.size} active)`)
 
-      // cancel any cleanup timeout
+      // cancel cleanup timeout
       if (shared.timeout) {
         clearTimeout(shared.timeout)
         shared.timeout = null
       }
 
-      // Patch close() to track disconnects
-      controller.close = new Proxy(controller.close, {
-        apply(target, thisArg, args) {
-          shared.clients.delete(controller)
-          console.log(`👋 Client left @${cleanUsername} (${shared.clients.size} left)`)
+      // Detect when client disconnects (page refresh, close, etc.)
+      event.node.res.on('close', () => {
+        shared.clients.delete(controller)
+        console.log(`👋 Client left @${cleanUsername} (${shared.clients.size} left)`)
 
-          if (shared.clients.size === 0) {
-            shared.timeout = setTimeout(() => {
-              console.log(`🕐 No clients for @${cleanUsername}, disconnecting after 60s idle`)
-              try {
-                shared.connection.disconnect()
-              } catch {}
-              connectionPool.delete(cleanUsername)
-              recentCache.delete(cleanUsername)
-            }, 60000)
-          }
-
-          return Reflect.apply(target, thisArg, args)
-        },
+        // No active viewers? disconnect in 60s
+        if (shared.clients.size === 0) {
+          shared.timeout = setTimeout(() => {
+            console.log(`🕐 No clients for @${cleanUsername}, disconnecting after 60s idle`)
+            shared.connection.disconnect()
+            connectionPool.delete(cleanUsername)
+          }, 60000)
+        }
       })
     },
   })
