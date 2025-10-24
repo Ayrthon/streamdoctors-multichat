@@ -1,0 +1,25 @@
+[build]
+  command = "npm run build"
+  publish = ".output/public"
+
+[build.environment]
+  NODE_VERSION = "20"
+  SECRETS_SCAN_ENABLED = "false"
+
+[[headers]]
+  for = "/_nuxt/builds/meta/*"
+  [headers.values]
+    cache-control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/_nuxt/builds/*"
+  [headers.values]
+    cache-control = "public, max-age=1, immutable"
+
+[[headers]]
+  for = "/_nuxt/*"
+  [headers.values]
+    cache-control = "public, max-age=31536000, immutable"
+
+
+SECRETS_SCAN_ENABLED=false
