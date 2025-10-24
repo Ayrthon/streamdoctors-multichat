@@ -33,7 +33,10 @@ import { useRoute } from 'vue-router'
 
 import tmi from 'tmi.js'
 
-definePageMeta({ layout: false })
+definePageMeta({
+  layout: false,
+  middleware: [],
+})
 
 const route = useRoute()
 
