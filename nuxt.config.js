@@ -14,7 +14,7 @@ export default defineNuxtConfig({
     // prerender: {
     //   crawlLinks: false,
     //   routes: ['/', '/200.html', '/404.html'],
-    //   ignore: ['/chatview', '/login', '/dashboard', '/auth'],
+    //   ignore: ['/chatview', '/login', '/dashboard', '/auth'], ok
     // },
   },
   serveStaticFallback: true,
