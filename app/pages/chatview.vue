@@ -37,7 +37,7 @@ definePageMeta({
   layout: false,
   middleware: [],
 })
-
+console.log(import.meta.env.VITE_FIREBASE_API_KEY)
 const route = useRoute()
 
 // 🔑 Token from URL
