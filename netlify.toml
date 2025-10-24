@@ -4,7 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  NITRO_PRESET = "static"
+  NITRO_PRESET = "netlify"
   SECRETS_SCAN_ENABLED = "false"
 
 [[headers]]
