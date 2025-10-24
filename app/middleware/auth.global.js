@@ -1,34 +1,32 @@
 // app/middleware/auth.global.js
 export default defineNuxtRouteMiddleware((to) => {
-  // Skip SSR or API routes
+  // SSR & API: skip
   if (import.meta.server || to.path.startsWith('/api')) return
 
-  // 👇 Skip middleware completely for chatview (static token-based page)
+  // ✅ HARD BYPASS for /chatview even if Nuxt hasn't hydrated the route yet
+  if (process.client) {
+    const rawPath = window.location.pathname || ''
+    if (rawPath.startsWith('/chatview')) return
+  }
+  // Also bypass once Nuxt router catches up
   if (to.path.startsWith('/chatview')) return
 
-  // Access auth state
+  // Now safe to read auth
   const { user, role } = useAuthState()
 
-  const publicPaths = ['/', '/no-access']
-  const isPublic = publicPaths.includes(to.path)
+  // On static hosting, user can be undefined for a tick — don't redirect yet
+  if (process.client && typeof user.value === 'undefined') return
 
-  // ⚠️ Prevent early redirects during hydration (Firebase static mode)
-  if (process.client && user.value === undefined) {
-    console.debug('[auth.global] Skipping redirect until auth hydrates')
-    return
-  }
+  const isPublic = to.path === '/' || to.path === '/no-access'
 
-  // 🚫 Not logged in → redirect to /
   if (!user.value && !isPublic) {
     return navigateTo('/')
   }
 
-  // 🚫 Logged in but pending → redirect to no-access
   if (user.value && role.value === 'pending' && to.path !== '/no-access') {
     return navigateTo('/no-access')
   }
 
-  // 🚫 Logged in → visiting login page → redirect to /projects
   if (user.value && to.path === '/') {
     return navigateTo('/projects')
   }
