@@ -77,10 +77,6 @@ import { signOut } from 'firebase/auth'
 import { useAuthState } from '~/composables/useAuthState'
 import { useSnackbar } from '~/composables/useSnackbar'
 
-// definePageMeta({
-//   middleware: ['auth'],
-// })
-
 const { snackbar } = useSnackbar() // ✅ must be inside <script setup> sa
 const { $auth } = useNuxtApp()
 const { user, role } = useAuthState()
