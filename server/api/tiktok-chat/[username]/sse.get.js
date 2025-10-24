@@ -14,6 +14,7 @@ export default defineEventHandler(async (event) => {
   if (!username) return new Response('Missing username', { status: 400 })
 
   const cleanUsername = username.replace(/^@/, '')
+
   const accountId = process.env.EULERSTREAM_ACCOUNT_ID || process.env.VITE_EULERSTREAM_ACCOUNT_ID
   const secret =
     process.env.EULERSTREAM_WEBHOOK_SECRET || process.env.VITE_EULERSTREAM_WEBHOOK_SECRET
@@ -33,6 +34,8 @@ export default defineEventHandler(async (event) => {
     const connection = new WebcastPushConnection(cleanUsername, { signServer })
     const clients = new Set()
 
+    connection._listenersRegistered = false
+
     shared = {
       connection,
       clients,
@@ -44,14 +47,13 @@ export default defineEventHandler(async (event) => {
 
     connectionPool.set(cleanUsername, shared)
 
-    // ---- Connect helper ----
+    // ---- Helper: try to connect ----
     async function tryConnect() {
       if (shared.connecting || connection.isConnected) {
         console.log(`⏸ Already connecting/connected for @${cleanUsername}`)
         return
       }
 
-      // Prevent rapid reconnects (<5s apart)
       const now = Date.now()
       if (now - shared.lastConnect < 5000) {
         console.log(`🕐 Skipping reconnect for @${cleanUsername} (too soon)`)
@@ -83,36 +85,46 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    // ---- Bind events ----
-    connection.on('chat', (msg) => {
-      const payload = {
-        user: msg.uniqueId,
-        message: msg.comment,
-        color: '#00f2ea',
-        timestamp: Date.now(),
-      }
+    // ---- Bind events (only once) ----
+    if (!connection._listenersRegistered) {
+      connection._listenersRegistered = true
 
-      const data = `data: ${JSON.stringify(payload)}\n\n`
-      for (const client of clients) {
-        try {
-          client.enqueue(data)
-        } catch {}
-      }
-    })
+      let lastMsgId = null
 
-    connection.on('disconnected', () => {
-      console.log(`🛑 Disconnected from @${cleanUsername}`)
-      if (clients.size > 0) {
-        console.log(`🔁 Reconnecting in 15s for @${cleanUsername}`)
-        setTimeout(tryConnect, 15000)
-      } else {
-        connectionPool.delete(cleanUsername)
-      }
-    })
+      connection.on('chat', (msg) => {
+        if (msg.msgId && msg.msgId === lastMsgId) return
+        lastMsgId = msg.msgId
 
-    connection.on('error', (err) => {
-      console.error(`⚠️ TikTok chat error for @${cleanUsername}:`, err)
-    })
+        const payload = {
+          user: msg.uniqueId,
+          message: msg.comment,
+          color: '#00f2ea',
+          timestamp: Date.now(),
+        }
+
+        const data = `data: ${JSON.stringify(payload)}\n\n`
+        for (const client of shared.clients) {
+          try {
+            client.enqueue(data)
+          } catch {}
+        }
+      })
+
+      connection.on('disconnected', () => {
+        console.log(`🛑 Disconnected from @${cleanUsername}`)
+        if (shared.clients.size > 0) {
+          console.log(`🔁 Reconnecting in 15s for @${cleanUsername}`)
+          setTimeout(tryConnect, 15000)
+        } else {
+          console.log(`💤 No clients, removing @${cleanUsername} from pool`)
+          connectionPool.delete(cleanUsername)
+        }
+      })
+
+      connection.on('error', (err) => {
+        console.error(`⚠️ TikTok chat error for @${cleanUsername}:`, err)
+      })
+    }
 
     // Initial connect
     tryConnect()
@@ -139,7 +151,9 @@ export default defineEventHandler(async (event) => {
           if (shared.clients.size === 0) {
             shared.timeout = setTimeout(() => {
               console.log(`🕐 No clients for @${cleanUsername}, disconnecting after 60s idle`)
-              shared.connection.disconnect()
+              try {
+                shared.connection.disconnect()
+              } catch {}
               connectionPool.delete(cleanUsername)
             }, 60000)
           }
