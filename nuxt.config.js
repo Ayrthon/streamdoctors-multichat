@@ -10,11 +10,12 @@ export default defineNuxtConfig({
     transpile: ['vuetify'],
   },
   nitro: {
-    preset: 'node',
+    preset: 'static',
     prerender: {
       crawlLinks: false,
       routes: ['/', '/200.html', '/404.html'],
-      ignore: ['/login', '/dashboard', '/auth'],
+      // 👇 don't prerender chatview so it loads only on client
+      ignore: ['/login', '/dashboard', '/auth', '/chatview'],
     },
   },
   serveStaticFallback: true,
