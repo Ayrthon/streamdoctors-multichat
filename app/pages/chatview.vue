@@ -242,8 +242,24 @@ watchEffect(async () => {
     let source = new EventSource(`/api/tiktok-chat/${username}/sse`)
 
     const setupTikTokSource = () => {
+      // 🧠 Local deduplication cache (per platform)
+      const recentTikTokMsgs = new Set()
+      const MAX_TIKTOK_CACHE = 200
+
       source.onmessage = (e) => {
         const msg = JSON.parse(e.data)
+
+        // Build a simple dedupe key (username + message)
+        const key = `${msg.user}-${msg.message}`
+        if (recentTikTokMsgs.has(key)) return
+        recentTikTokMsgs.add(key)
+
+        // Limit cache size
+        if (recentTikTokMsgs.size > MAX_TIKTOK_CACHE) {
+          const first = recentTikTokMsgs.values().next()
+          if (!first.done) recentTikTokMsgs.delete(first.value)
+        }
+
         messages.value.push({
           platform: 'tiktok',
           country: account.country || '',
@@ -252,6 +268,7 @@ watchEffect(async () => {
           color: msg.color,
           timestamp: msg.timestamp,
         })
+
         if (messages.value.length > 100) messages.value.shift()
       }
 

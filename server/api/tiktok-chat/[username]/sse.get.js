@@ -1,12 +1,16 @@
 import { WebcastPushConnection } from 'tiktok-live-connector'
 
-// 🧠 Global connection pool
+// 🧠 Global connection pool (username → { connection, clients, ... })
 const connectionPool = new Map()
 
-// 🧹 Reset on hot reload (Nuxt dev only)
+// 🧠 Global dedupe cache (username → Set of message IDs)
+const recentCache = new Map()
+
+// 🧹 Dev hot reload cleanup
 if (process.env.NODE_ENV === 'development') {
   connectionPool.clear()
-  console.log('🧹 Dev mode: cleared old TikTok connections')
+  recentCache.clear()
+  console.log('🧹 Dev mode: cleared old TikTok connections and caches')
 }
 
 export default defineEventHandler(async (event) => {
@@ -26,8 +30,8 @@ export default defineEventHandler(async (event) => {
 
   const signServer = { endpoint: 'https://sign.eulerstream.com', accountId, secret }
 
+  // Get or create shared connection for this username
   let shared = connectionPool.get(cleanUsername)
-
   if (!shared) {
     console.log(`⚡ Creating new TikTok connection for @${cleanUsername}`)
 
@@ -85,15 +89,25 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    // ---- Bind events (only once) ----
+    // ---- Bind events (only once per username) ----
     if (!connection._listenersRegistered) {
       connection._listenersRegistered = true
 
-      let lastMsgId = null
+      // 🧠 Deduplication cache for recent message IDs
+      const recentMsgIds = recentCache.get(cleanUsername) || new Set()
+      recentCache.set(cleanUsername, recentMsgIds)
+      const MAX_CACHE_SIZE = 300
 
       connection.on('chat', (msg) => {
-        if (msg.msgId && msg.msgId === lastMsgId) return
-        lastMsgId = msg.msgId
+        const msgId = msg.msgId || `${msg.uniqueId}-${msg.comment}-${Math.floor(Date.now() / 1000)}`
+        if (recentMsgIds.has(msgId)) return
+        recentMsgIds.add(msgId)
+
+        // 🧹 Keep cache small (FIFO)
+        if (recentMsgIds.size > MAX_CACHE_SIZE) {
+          const first = recentMsgIds.values().next()
+          if (!first.done) recentMsgIds.delete(first.value)
+        }
 
         const payload = {
           user: msg.uniqueId,
@@ -116,8 +130,9 @@ export default defineEventHandler(async (event) => {
           console.log(`🔁 Reconnecting in 15s for @${cleanUsername}`)
           setTimeout(tryConnect, 15000)
         } else {
-          console.log(`💤 No clients, removing @${cleanUsername} from pool`)
+          console.log(`💤 No clients left, cleaning up @${cleanUsername}`)
           connectionPool.delete(cleanUsername)
+          recentCache.delete(cleanUsername)
         }
       })
 
@@ -136,13 +151,13 @@ export default defineEventHandler(async (event) => {
       shared.clients.add(controller)
       console.log(`👤 Client connected to @${cleanUsername} (${shared.clients.size} active)`)
 
-      // cancel cleanup timeout
+      // cancel any cleanup timeout
       if (shared.timeout) {
         clearTimeout(shared.timeout)
         shared.timeout = null
       }
 
-      // Patch close() so we can track disconnects
+      // Patch close() to track disconnects
       controller.close = new Proxy(controller.close, {
         apply(target, thisArg, args) {
           shared.clients.delete(controller)
@@ -155,6 +170,7 @@ export default defineEventHandler(async (event) => {
                 shared.connection.disconnect()
               } catch {}
               connectionPool.delete(cleanUsername)
+              recentCache.delete(cleanUsername)
             }, 60000)
           }
 
