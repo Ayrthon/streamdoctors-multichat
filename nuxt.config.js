@@ -14,8 +14,7 @@ export default defineNuxtConfig({
     prerender: {
       crawlLinks: false,
       routes: ['/', '/200.html', '/404.html'],
-      // 👇 don't prerender chatview so it loads only on client
-      ignore: ['/login', '/dashboard', '/auth', '/chatview'],
+      ignore: ['/login', '/dashboard', '/auth'],
     },
   },
   serveStaticFallback: true,
