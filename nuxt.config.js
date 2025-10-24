@@ -32,7 +32,22 @@ export default defineNuxtConfig({
     autoImports: ['defineStore', 'storeToRefs'],
   },
   runtimeConfig: {
+    // ❌ server-only secrets
     jwtSecret: process.env.JWT_SECRET,
-    youtubeApiKey: process.env.YOUTUBE_API_KEY,
+    firebasePrivateKey: process.env.FIREBASE_PRIVATE_KEY,
+    firebaseClientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+
+    // ✅ public, safe for client bundle
+    public: {
+      firebase: {
+        apiKey: process.env.VITE_FIREBASE_API_KEY,
+        authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+        projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+        storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+        appId: process.env.VITE_FIREBASE_APP_ID,
+      },
+      youtubeApiKey: process.env.YOUTUBE_API_KEY,
+    },
   },
 })
