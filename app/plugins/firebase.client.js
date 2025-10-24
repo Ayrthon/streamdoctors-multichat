@@ -4,6 +4,11 @@ import { GoogleAuthProvider, getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
 export default defineNuxtPlugin((nuxtApp) => {
+  console.log('[ROUTER DEBUG] route:', window.location.pathname)
+  useRouter().afterEach((to, from) => {
+    console.log('[ROUTER DEBUG] Navigated', from.fullPath, '→', to.fullPath)
+  })
+
   const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,

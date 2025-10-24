@@ -1,5 +1,7 @@
 // app/middleware/auth.global.js
 export default defineNuxtRouteMiddleware((to) => {
+  console.log('[AUTH MIDDLEWARE] fired for', to.fullPath)
+
   // SSR & API: skip
   if (import.meta.server || to.path.startsWith('/api')) return
 
