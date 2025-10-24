@@ -10,12 +10,12 @@ export default defineNuxtConfig({
     transpile: ['vuetify'],
   },
   nitro: {
-    preset: 'static',
-    prerender: {
-      crawlLinks: false,
-      routes: ['/', '/200.html', '/404.html'],
-      ignore: ['/login', '/dashboard', '/auth'],
-    },
+    preset: 'netlify',
+    // prerender: {
+    //   crawlLinks: false,
+    //   routes: ['/', '/200.html', '/404.html'],
+    //   ignore: ['/chatview', '/login', '/dashboard', '/auth'],
+    // },
   },
   serveStaticFallback: true,
   vite: {
