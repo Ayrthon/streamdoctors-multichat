@@ -129,7 +129,7 @@ const { showSnackbar } = useSnackbar()
 
 const route = useRoute()
 const router = useRouter()
-const { user } = useAuthState()
+// const { user } = useAuthState()
 const projectsStore = useProjectsStore()
 
 const project = computed(() => projectsStore.currentProject)
