@@ -6,7 +6,7 @@ export default defineNuxtRouteMiddleware((to) => {
   if (import.meta.server || to.path.startsWith('/api')) return
 
   // ✅ HARD BYPASS for /chatview even if Nuxt hasn't hydrated the route yet
-  if (process.client) {
+  if (import.meta.client) {
     const rawPath = window.location.pathname || ''
     if (rawPath.startsWith('/chatview')) return
   }
@@ -17,7 +17,7 @@ export default defineNuxtRouteMiddleware((to) => {
   const { user, role } = useAuthState()
 
   // On static hosting, user can be undefined for a tick — don't redirect yet
-  if (process.client && typeof user.value === 'undefined') return
+  if (import.meta.client && typeof user.value === 'undefined') return
 
   const isPublic = to.path === '/' || to.path === '/no-access'
 
