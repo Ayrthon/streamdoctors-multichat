@@ -81,7 +81,7 @@ definePageMeta({
   middleware: ['auth'],
 })
 
-const { snackbar } = useSnackbar() // ✅ must be inside <script setup>
+const { snackbar } = useSnackbar() // ✅ must be inside <script setup> sa
 const { $auth } = useNuxtApp()
 const { user, role } = useAuthState()
 const router = useRouter()
