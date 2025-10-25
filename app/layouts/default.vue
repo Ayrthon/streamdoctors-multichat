@@ -9,7 +9,7 @@
 
       <v-list density="compact" nav>
         <v-list-item
-          v-if="role === 'admin'"
+          v-if="role === 'admin' || role === 'client'"
           prepend-icon="mdi-folder"
           title="Projects"
           value="projects"
