@@ -21,9 +21,11 @@
       <span v-if="msg.country" class="flag">{{ countryFlag(msg.country) }}</span>
 
       <!-- Username + message -->
-      <strong :style="{ color: msg.color }">{{ msg.user }}</strong
-      >:
-      <span v-html="msg.html"></span>
+      <div class="chat-msg">
+        <strong :style="{ color: msg.color }">{{ msg.user }}</strong>
+        <span class="colon">: </span>
+        <span class="text" v-html="msg.html"></span>
+      </div>
     </div>
   </div>
 </template>
@@ -86,7 +88,6 @@ const platformIcons = {
   twitch: 'mdi-twitch',
   youtube: 'mdi-youtube',
   instagram: 'mdi-instagram',
-  tiktok: 'mdi-alpha-t',
 }
 
 const platformColor = (platform) => {
@@ -127,17 +128,23 @@ async function getLiveId(channelHandle) {
 // 🧩 Connect YouTube SSE
 function connectYouTubeSSE(liveVideoId, account) {
   const source = new EventSource(`/api/youtube-chat/${liveVideoId}`)
+  console.log('youtube' + source)
 
   source.onmessage = (e) => {
     const msg = JSON.parse(e.data)
+
+    // 🧹 Remove "@" from YouTube usernames
+    const cleanUser = msg.user?.replace(/^@/, '') || msg.user
+
     messages.value.push({
       platform: 'youtube',
       country: account.country || '',
-      user: msg.user,
+      user: cleanUser,
       html: msg.message,
       color: '#ff0000',
       timestamp: msg.timestamp || Date.now(),
     })
+
     if (messages.value.length > 100) messages.value.shift()
   }
 
@@ -228,10 +235,17 @@ watchEffect(async () => {
 
   // 🔴 YouTube
   const youtubeAccounts = platforms.value.filter((p) => p.type === 'youtube')
+
   for (const account of youtubeAccounts) {
+    console.log(`🔍 Checking YouTube handle: ${account.username}`)
     const liveId = await getLiveId(account.username)
-    if (!liveId) continue
-    console.log(`✅ Connecting YouTube SSE for ${account.username}`)
+
+    if (!liveId) {
+      console.warn(`❌ No liveId found for ${account.username}`)
+      continue
+    }
+
+    console.log(`✅ Connecting YouTube SSE for ${account.username} (videoId: ${liveId})`)
     connectYouTubeSSE(liveId, account)
   }
 
@@ -307,31 +321,85 @@ watchEffect(async () => {
   background: transparent;
   color: white;
   padding: 1rem;
-  font-family: sans-serif;
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
   height: 100vh;
   pointer-events: none;
   text-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
 }
 
+/* === TWITCH-AUTHENTIC CHAT LINE === */
 .chat-line {
-  font-size: 2rem;
-  line-height: 1.3;
-  opacity: 0.9;
-  animation: fade-in 0.3s ease forwards;
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  align-items: flex-start;
+  gap: 0.32rem; /* slightly tighter than 0.4 for Twitch-like density */
+  font-size: 1.9rem; /* Twitch uses ~19px base */
+  line-height: 1.35; /* true Twitch vertical rhythm */
+  letter-spacing: -0.01em;
+  opacity: 0.95;
+  animation: fade-in 0.25s ease forwards;
+  margin-bottom: 0.1rem; /* micro gap between messages */
 }
 
+/* username + colon stay glued */
+.chat-line strong {
+  white-space: nowrap;
+  display: inline-block;
+  margin-right: 0.25rem;
+  font-weight: 600;
+}
+
+/* message text area */
+.chat-line span[v-html] {
+  display: inline;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.chat-line > * {
+  align-self: flex-start;
+}
+
+/* === ICON + FLAG BASELINE ALIGNMENT === */
+.chat-line :deep(.v-icon),
+.chat-line .icon-svg,
+.chat-line .flag {
+  flex-shrink: 0;
+  display: inline-block;
+  width: 0.95em;
+  height: 0.95em;
+  vertical-align: baseline;
+  transform: translateY(0.15em); /* perfect baseline */
+}
+
+/* platform icons */
+.chat-line :deep(.v-icon) {
+  font-size: 0.95em !important;
+  line-height: 1;
+}
+.chat-line :deep(.v-icon svg) {
+  width: 1em;
+  height: 1em;
+}
+
+/* TikTok fallback icon */
+.chat-line .icon-svg {
+  filter: brightness(0) invert(1);
+}
+
+/* flag (same height as icon) */
+.chat-line .flag {
+  font-size: 0.95em;
+  line-height: 1;
+  margin-right: 0.05rem;
+}
+
+/* emotes */
 .emote {
   vertical-align: middle;
   height: 1.5em;
   margin: 0 0.1em;
 }
-.flag {
-  font-size: 1.1rem;
-  line-height: 1;
-}
+
+/* platform colors */
 .text-purple {
   color: #9146ff !important;
 }
@@ -345,20 +413,14 @@ watchEffect(async () => {
   color: #00f2ea !important;
 }
 
-.icon-svg {
-  width: 0.5em;
-  height: 0.5em;
-  vertical-align: middle;
-  filter: brightness(0) invert(1);
-}
-
+/* animation */
 @keyframes fade-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(6px);
   }
   to {
-    opacity: 0.9;
+    opacity: 0.95;
     transform: translateY(0);
   }
 }

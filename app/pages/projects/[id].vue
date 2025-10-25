@@ -36,9 +36,16 @@
       <v-col v-for="(p, index) in editableProject.platforms" :key="index">
         <v-card variant="tonal" class="h-100 d-flex flex-column justify-space-between">
           <v-card-title class="d-flex align-center">
-            <v-icon :color="iconColor(p.type)" class="mr-2">
-              {{ iconFor(p.type) }}
-            </v-icon>
+            <div class="d-flex align-center mr-2">
+              <template v-if="iconFor(p.type) === 'tiktok-svg'">
+                <span class="svg-icon tiktok-icon" />
+              </template>
+              <template v-else>
+                <v-icon :color="iconColor(p.type)">
+                  {{ iconFor(p.type) }}
+                </v-icon>
+              </template>
+            </div>
             <span class="text-subtitle-1 font-weight-medium">{{ p.type.toUpperCase() }}</span>
           </v-card-title>
 
@@ -98,22 +105,29 @@
         </v-card-title>
 
         <v-card-text>
-          <v-select
-            label="Platform"
-            v-model="dialogPlatform.type"
-            :items="['twitch', 'youtube', 'tiktok', 'instagram']"
-          />
-          <v-select
-            label="Country"
-            v-model="dialogPlatform.country"
-            :items="['NL', 'BE', 'DE', 'FR', 'UK']"
-          />
-          <v-text-field label="Channel Name" v-model="dialogPlatform.username" />
+          <v-form ref="platformForm">
+            <v-select
+              label="Platform"
+              v-model="dialogPlatform.type"
+              :items="['twitch', 'youtube', 'tiktok', 'instagram']"
+              :rules="[rules.required]"
+            />
+            <v-select
+              label="Country (optional)"
+              v-model="dialogPlatform.country"
+              :items="['', 'NL', 'BE', 'DE', 'FR', 'US', 'UK']"
+            />
+            <v-text-field
+              label="Channel Name"
+              v-model="dialogPlatform.username"
+              :rules="[rules.required]"
+            />
+          </v-form>
         </v-card-text>
 
         <v-card-actions class="justify-end">
           <v-btn text="Cancel" @click="closeDialog" />
-          <v-btn color="primary" text="Done" @click="savePlatform" />
+          <v-btn color="primary" text="Done" @click="validateAndSavePlatform" />
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -121,7 +135,7 @@
 </template>
 
 <script setup>
-import { useAuthState } from '~/composables/useAuthState'
+// import { useAuthState } from '~/composables/useAuthState'
 import { useSnackbar } from '~/composables/useSnackbar'
 import { useProjectsStore } from '~/stores/projectsStore'
 
@@ -140,6 +154,12 @@ const dialog = ref(false)
 const editingIndex = ref(null)
 const dialogPlatform = ref({ type: '', country: '', username: '' })
 
+const platformForm = ref(null)
+
+const rules = {
+  required: (v) => !!v || 'This field is required',
+}
+
 const chatUrl = computed(() =>
   project.value?.publicToken
     ? `${window.location.origin}/chatview?token=${project.value.publicToken}`
@@ -150,7 +170,7 @@ const iconFor = (type) =>
   ({
     twitch: 'mdi-twitch',
     youtube: 'mdi-youtube',
-    tiktok: 'mdi-alpha-t',
+    tiktok: 'tiktok-svg',
     instagram: 'mdi-instagram',
   })[type] || 'mdi-earth'
 
@@ -187,11 +207,20 @@ const editPlatform = (index) => {
   dialog.value = true
 }
 
+/* ✅ Correct Vuetify 3 validation logic */
+const validateAndSavePlatform = async () => {
+  const result = await platformForm.value?.validate()
+  if (!result?.valid) return // stop if invalid
+  savePlatform()
+}
+
 const savePlatform = async () => {
   const updated = [...(editableProject.value.platforms || [])]
-  if (editingIndex.value !== null)
+  if (editingIndex.value !== null) {
     updated.splice(editingIndex.value, 1, { ...dialogPlatform.value })
-  else updated.push({ ...dialogPlatform.value, connected: false })
+  } else {
+    updated.push({ ...dialogPlatform.value, connected: false })
+  }
 
   editableProject.value.platforms = updated
   closeDialog()
@@ -200,6 +229,7 @@ const savePlatform = async () => {
 const closeDialog = () => {
   dialog.value = false
   editingIndex.value = null
+  platformForm.value?.resetValidation() // optional cleanup
 }
 
 const removePlatform = (index) => editableProject.value.platforms.splice(index, 1)
@@ -228,27 +258,6 @@ const copyChatUrl = () => {
   navigator.clipboard.writeText(chatUrl.value)
   showSnackbar('Copied chat URL!', 'info')
 }
-
-// Snackbar helper
-// const useSnackbar = (text, color = 'info') => {
-//   const v = document.createElement('div')
-//   v.className = `
-//     fixed bottom-6 right-6
-//     bg-${color} text-white
-//     px-4 py-2 rounded shadow
-//     transition-all duration-300
-//   `
-//   v.style.zIndex = '9999' // ✅ ensures it's above drawers/toolbars
-//   v.innerText = text
-//   document.body.appendChild(v)
-
-//   // Smooth fade out
-//   setTimeout(() => {
-//     v.style.opacity = '0'
-//     v.style.transform = 'translateY(10px)'
-//     setTimeout(() => v.remove(), 300)
-//   }, 2000)
-// }
 </script>
 
 <style scoped>
