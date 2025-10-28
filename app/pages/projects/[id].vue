@@ -79,7 +79,7 @@
 
     <!-- CHAT URL -->
     <v-divider class="my-4" />
-    <h3 class="text-h6 font-weight-medium mb-2">Chat URL</h3>
+    <h3 class="text-h6 font-weight-medium mb-2">Chat Overlay URL</h3>
     <v-text-field
       v-model="chatUrl"
       readonly
@@ -89,6 +89,16 @@
       @click:append-inner="copyChatUrl"
       hint="Copy and paste this link into your OBS browser source"
       persistent-hint
+    />
+    <v-divider class="my-4" />
+    <h3 class="text-h6 font-weight-medium mb-2">Scrollable Chat URL</h3>
+    <v-text-field
+      v-model="chatUrlNoScroll"
+      readonly
+      density="comfortable"
+      variant="outlined"
+      append-inner-icon="mdi-content-copy"
+      @click:append-inner="copyChatUrlNoScroll"
     />
 
     <div class="d-flex mt-5 justify-end">
@@ -161,6 +171,12 @@ const rules = {
 }
 
 const chatUrl = computed(() =>
+  project.value?.publicToken
+    ? `${window.location.origin}/chatview?token=${project.value.publicToken}&scrollable=false`
+    : ''
+)
+
+const chatUrlNoScroll = computed(() =>
   project.value?.publicToken
     ? `${window.location.origin}/chatview?token=${project.value.publicToken}`
     : ''
@@ -256,6 +272,12 @@ const removeProject = async () => {
 const copyChatUrl = () => {
   if (!chatUrl.value) return
   navigator.clipboard.writeText(chatUrl.value)
+  showSnackbar('Copied chat URL!', 'info')
+}
+
+const copyChatUrlNoScroll = () => {
+  if (!chatUrl.value) return
+  navigator.clipboard.writeText(chatUrlNoScroll.value)
   showSnackbar('Copied chat URL!', 'info')
 }
 </script>

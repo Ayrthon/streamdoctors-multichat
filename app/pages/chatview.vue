@@ -1,6 +1,11 @@
 <template>
   <div class="chat-container">
-    <div ref="scrollContainer" class="chat-scroll" @scroll="onScroll">
+    <div
+      ref="scrollContainer"
+      class="chat-scroll"
+      :class="{ 'scroll-disabled': !scrollable }"
+      @scroll="onScroll"
+    >
       <div class="chat-inner">
         <div v-for="(msg, i) in messages" :key="i" class="chat-line d-flex align-center ga-2">
           <v-icon
@@ -49,6 +54,7 @@ definePageMeta({ layout: false })
 /* === Routing / token === */
 const route = useRoute()
 const token = computed(() => route.query.token)
+const scrollable = computed(() => route.query.scrollable !== 'false') // ✅ Default true, false if ?scrollable=false
 
 /* === Data === */
 const projectId = ref(null)
@@ -381,8 +387,14 @@ watchEffect(async () => {
   overflow-y: auto;
   pointer-events: auto;
   padding: 1rem;
+  /* ✅ Show scrollbar by default */
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+/* ✅ Disable scrolling when scrollable=false */
+.chat-scroll.scroll-disabled {
+  overflow-y: hidden;
 }
 
 .chat-inner {
