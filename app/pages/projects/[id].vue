@@ -52,9 +52,6 @@
           <v-card-text>
             <div><strong>Channel:</strong> {{ p.username || 'N/A' }}</div>
             <div><strong>Location:</strong> {{ p.country || 'N/A' }}</div>
-            <!-- <v-chip size="small" :color="p.connected ? 'success' : 'error'" class="mt-2">
-              {{ p.connected ? 'Connected' : 'Disconnected' }}
-            </v-chip> -->
           </v-card-text>
 
           <v-card-actions class="justify-end">
@@ -90,15 +87,30 @@
       hint="Copy and paste this link into your OBS browser source"
       persistent-hint
     />
+
     <v-divider class="my-4" />
-    <h3 class="text-h6 font-weight-medium mb-2">Scrollable Chat URL</h3>
+
+    <!-- ✅ Chat Logging Toggle -->
+    <div class="d-flex align-center justify-space-between mb-2">
+      <h3 class="text-h6 font-weight-medium">Moderator Chat URL</h3>
+      <v-switch
+        v-model="enableChatLogging"
+        color="primary"
+        label="Enable Chat Logging"
+        hide-details
+        density="compact"
+      />
+    </div>
+
     <v-text-field
-      v-model="chatUrlNoScroll"
+      v-model="chatUrlModerator"
       readonly
       density="comfortable"
       variant="outlined"
       append-inner-icon="mdi-content-copy"
-      @click:append-inner="copyChatUrlNoScroll"
+      @click:append-inner="copyChatUrlModerator"
+      hint="Chat url for monitoring, scrolling and chatlogging"
+      persistent-hint
     />
 
     <div class="d-flex mt-5 justify-end">
@@ -145,7 +157,6 @@
 </template>
 
 <script setup>
-// import { useAuthState } from '~/composables/useAuthState'
 import { useSnackbar } from '~/composables/useSnackbar'
 import { useProjectsStore } from '~/stores/projectsStore'
 
@@ -153,7 +164,6 @@ const { showSnackbar } = useSnackbar()
 
 const route = useRoute()
 const router = useRouter()
-// const { user } = useAuthState()
 const projectsStore = useProjectsStore()
 
 const project = computed(() => projectsStore.currentProject)
@@ -166,6 +176,9 @@ const dialogPlatform = ref({ type: '', country: '', username: '' })
 
 const platformForm = ref(null)
 
+// ✅ Chat logging toggle
+const enableChatLogging = ref(false)
+
 const rules = {
   required: (v) => !!v || 'This field is required',
 }
@@ -176,11 +189,12 @@ const chatUrl = computed(() =>
     : ''
 )
 
-const chatUrlNoScroll = computed(() =>
-  project.value?.publicToken
-    ? `${window.location.origin}/chatview?token=${project.value.publicToken}`
-    : ''
-)
+// ✅ Moderator URL with conditional controls parameter
+const chatUrlModerator = computed(() => {
+  if (!project.value?.publicToken) return ''
+  const baseUrl = `${window.location.origin}/chatview?token=${project.value.publicToken}`
+  return enableChatLogging.value ? `${baseUrl}&controls=true` : baseUrl
+})
 
 const iconFor = (type) =>
   ({
@@ -223,10 +237,9 @@ const editPlatform = (index) => {
   dialog.value = true
 }
 
-/* ✅ Correct Vuetify 3 validation logic */
 const validateAndSavePlatform = async () => {
   const result = await platformForm.value?.validate()
-  if (!result?.valid) return // stop if invalid
+  if (!result?.valid) return
   savePlatform()
 }
 
@@ -245,7 +258,7 @@ const savePlatform = async () => {
 const closeDialog = () => {
   dialog.value = false
   editingIndex.value = null
-  platformForm.value?.resetValidation() // optional cleanup
+  platformForm.value?.resetValidation()
 }
 
 const removePlatform = (index) => editableProject.value.platforms.splice(index, 1)
@@ -272,13 +285,13 @@ const removeProject = async () => {
 const copyChatUrl = () => {
   if (!chatUrl.value) return
   navigator.clipboard.writeText(chatUrl.value)
-  showSnackbar('Copied chat URL!', 'info')
+  showSnackbar('Copied chat overlay URL!', 'info')
 }
 
-const copyChatUrlNoScroll = () => {
-  if (!chatUrl.value) return
-  navigator.clipboard.writeText(chatUrlNoScroll.value)
-  showSnackbar('Copied chat URL!', 'info')
+const copyChatUrlModerator = () => {
+  if (!chatUrlModerator.value) return
+  navigator.clipboard.writeText(chatUrlModerator.value)
+  showSnackbar('Copied moderator chat URL!', 'info')
 }
 </script>
 
