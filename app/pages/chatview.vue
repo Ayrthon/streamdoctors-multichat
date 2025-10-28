@@ -700,7 +700,7 @@ watchEffect(async () => {
   }
 
   .chat-line {
-    font-size: 1.4rem;
+    font-size: 1.3rem;
   }
 
   .paused-button {
@@ -716,12 +716,45 @@ watchEffect(async () => {
   }
 
   .chat-line {
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     gap: 0.2rem;
   }
 
   .chat-line strong {
-    font-size: 0.95em;
+    font-size: 0.9em;
+  }
+
+  .chat-scroll {
+    padding: 0.25rem;
+  }
+}
+
+/* Extra small devices (iPhone SE, etc - 375px and below) */
+@media (max-width: 400px) {
+  .chat-line {
+    font-size: 1rem;
+    gap: 0.15rem;
+    line-height: 1.3;
+  }
+
+  .chat-line strong {
+    font-size: 0.85em;
+    margin-right: 0.15rem;
+  }
+
+  .chat-scroll {
+    padding: 0.25rem;
+  }
+
+  .chat-line :deep(.v-icon),
+  .chat-line .icon-svg,
+  .chat-line .flag {
+    width: 0.85em;
+    height: 0.85em;
+  }
+
+  .emote {
+    height: 1.3em;
   }
 }
 
