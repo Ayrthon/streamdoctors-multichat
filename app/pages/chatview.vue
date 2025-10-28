@@ -653,6 +653,19 @@ watchEffect(async () => {
 :global(body) {
   overflow: hidden;
   height: 100%;
+  /* Prevent text size adjustments on mobile */
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+}
+
+/* Ensure proper mobile viewport */
+@media (max-width: 768px) {
+  :global(html),
+  :global(body) {
+    position: fixed;
+    width: 100%;
+  }
 }
 
 /* === Logging Controls Panel === */
@@ -669,6 +682,69 @@ watchEffect(async () => {
   pointer-events: auto;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
   z-index: 1000;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .controls-panel {
+    top: 0.5rem;
+    right: 0.5rem;
+    left: 0.5rem;
+    width: auto;
+    max-width: 320px;
+    margin: 0 auto;
+  }
+
+  .chat-scroll {
+    padding: 0.5rem;
+  }
+
+  .chat-line {
+    font-size: 1.4rem;
+  }
+
+  .paused-button {
+    bottom: 0.5rem;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .controls-panel {
+    width: calc(100vw - 1rem);
+    max-width: none;
+  }
+
+  .chat-line {
+    font-size: 1.2rem;
+    gap: 0.2rem;
+  }
+
+  .chat-line strong {
+    font-size: 0.95em;
+  }
+}
+
+/* Landscape mobile */
+@media (max-height: 500px) and (orientation: landscape) {
+  .controls-panel {
+    top: 0.25rem;
+    right: 0.25rem;
+    width: 240px;
+    font-size: 0.85rem;
+  }
+
+  .controls-header {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .controls-body {
+    padding: 0.75rem;
+  }
+
+  .stat-row {
+    font-size: 0.75rem;
+  }
 }
 
 .controls-header {
