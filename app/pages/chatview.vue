@@ -26,7 +26,12 @@
     </div>
 
     <transition name="fade">
-      <v-btn v-if="isPaused" class="paused-button" color="primary" @click="resumeChat">
+      <v-btn
+        v-if="isPaused && scrollPauseEnabled"
+        class="paused-button"
+        color="primary"
+        @click="resumeChat"
+      >
         Chat paused — click to resume
       </v-btn>
     </transition>
@@ -98,6 +103,9 @@ function onScroll() {
 
   lastScrollTop = currentTop
 
+  // ✅ Skip scroll pause logic if disabled
+  if (!scrollPauseEnabled.value) return
+
   // Only respond to real user interactions
   if (!userInteracted.value) return
 
@@ -145,9 +153,24 @@ onBeforeUnmount(() => {
 watch(
   () => messages.value.length,
   async (newLength, oldLength) => {
+    const el = scrollContainer.value
+    if (!el) return
+
     // Skip initial load
     if (oldLength === 0) {
       await scrollToBottom(false)
+      return
+    }
+
+    // ✅ If scroll pause is disabled, always auto-scroll
+    if (!scrollPauseEnabled.value) {
+      await scrollToBottom(false)
+      return
+    }
+
+    // ✅ If paused and scrolled up, DON'T change scroll position at all
+    if (isPaused.value && !autoScroll.value) {
+      // Simply don't scroll - let new messages appear below without moving viewport
       return
     }
 
@@ -155,7 +178,6 @@ watch(
     if (autoScroll.value && !isPaused.value) {
       await scrollToBottom(false)
     }
-    // Otherwise, stay where we are (viewport locked for reading)
   }
 )
 
@@ -165,6 +187,9 @@ const { data } = await useFetch(
   { key: () => `chatview:${token.value || 'none'}` }
 )
 if (!token.value) console.warn('[chatview] Missing ?token=')
+
+// ✅ Check if scroll pause is enabled for this project
+const scrollPauseEnabled = computed(() => data.value?.enableScrollPause !== false)
 
 /* === User color / icon helpers === */
 const userColorCache = new Map()
@@ -227,7 +252,6 @@ function connectYouTubeSSE(liveVideoId, account) {
       color: '#ff0000',
       timestamp: msg.timestamp || Date.now(),
     })
-    if (messages.value.length > 100) messages.value.shift()
   }
   src.onerror = (e) => console.warn('YouTube SSE error', e)
   src.addEventListener('end', () => src.close())
@@ -291,7 +315,6 @@ watchEffect(async () => {
         html,
         timestamp: Date.now(),
       })
-      if (messages.value.length > 100) messages.value.shift()
     })
     onBeforeUnmount(() => client.disconnect())
   }
@@ -324,7 +347,6 @@ watchEffect(async () => {
           color: msg.color,
           timestamp: msg.timestamp,
         })
-        if (messages.value.length > 100) messages.value.shift()
       }
       src.onerror = () => {
         src.close()
