@@ -40,6 +40,67 @@
         Chat paused — click to resume
       </v-btn>
     </transition>
+
+    <!-- Logging Controls Panel -->
+    <div v-if="showControls" class="controls-panel">
+      <div class="controls-header">
+        <span class="controls-title">📝 Chat Logging</span>
+      </div>
+
+      <div class="controls-body">
+        <div v-if="!isLogging" class="controls-section">
+          <v-btn color="success" block prepend-icon="mdi-record-circle" @click="startLogging">
+            Start Logging
+          </v-btn>
+        </div>
+
+        <div v-else class="controls-section">
+          <div class="stat-row">
+            <span class="stat-label">Status:</span>
+            <span class="stat-value recording">🔴 Recording</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Messages:</span>
+            <span class="stat-value">{{ loggingMessages.length }}</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Duration:</span>
+            <span class="stat-value">{{ sessionDuration }}</span>
+          </div>
+
+          <v-btn
+            color="error"
+            block
+            prepend-icon="mdi-stop-circle"
+            @click="stopLogging"
+            class="mt-2"
+          >
+            Stop Logging
+          </v-btn>
+
+          <div class="download-buttons mt-3">
+            <v-btn
+              size="small"
+              variant="tonal"
+              prepend-icon="mdi-download"
+              @click="downloadJSON"
+              :disabled="loggingMessages.length === 0"
+            >
+              JSON
+            </v-btn>
+            <v-btn
+              size="small"
+              variant="tonal"
+              prepend-icon="mdi-download"
+              @click="downloadCSV"
+              :disabled="loggingMessages.length === 0"
+            >
+              CSV
+            </v-btn>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -54,12 +115,20 @@ definePageMeta({ layout: false })
 /* === Routing / token === */
 const route = useRoute()
 const token = computed(() => route.query.token)
-const scrollable = computed(() => route.query.scrollable !== 'false') // ✅ Default true, false if ?scrollable=false
+const scrollable = computed(() => route.query.scrollable !== 'false')
+const showControls = computed(() => route.query.controls === 'true')
 
 /* === Data === */
 const projectId = ref(null)
 const platforms = ref([])
 const messages = ref([])
+
+/* === Logging State === */
+const isLogging = ref(false)
+const loggingMessages = ref([])
+const sessionStartTime = ref(null)
+const sessionDuration = ref('00:00:00')
+let durationInterval = null
 
 /* === Scroll state === */
 const scrollContainer = ref(null)
@@ -109,19 +178,14 @@ function onScroll() {
 
   lastScrollTop = currentTop
 
-  // ✅ Skip scroll pause logic if disabled
   if (!scrollPauseEnabled.value) return
-
-  // Only respond to real user interactions
   if (!userInteracted.value) return
 
-  // Pause when user scrolls up away from bottom
   if (scrollingUp && !atBottom) {
     isPaused.value = true
     autoScroll.value = false
   }
 
-  // Resume when user manually scrolls to bottom
   if (atBottom && isPaused.value) {
     isPaused.value = false
     autoScroll.value = true
@@ -143,7 +207,6 @@ onMounted(async () => {
 
   lastScrollTop = el.scrollTop
 
-  // Mark user interactions
   el.addEventListener('wheel', markUserIntent, { passive: true })
   el.addEventListener('touchstart', markUserIntent, { passive: true })
   el.addEventListener('touchmove', markUserIntent, { passive: true })
@@ -153,6 +216,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   clearTimeout(userIntentTimeout)
   clearTimeout(scrollCheckTimeout)
+  if (durationInterval) clearInterval(durationInterval)
 })
 
 /* Auto-scroll new messages - ONLY when not paused */
@@ -162,25 +226,20 @@ watch(
     const el = scrollContainer.value
     if (!el) return
 
-    // Skip initial load
     if (oldLength === 0) {
       await scrollToBottom(false)
       return
     }
 
-    // ✅ If scroll pause is disabled, always auto-scroll
     if (!scrollPauseEnabled.value) {
       await scrollToBottom(false)
       return
     }
 
-    // ✅ If paused and scrolled up, DON'T change scroll position at all
     if (isPaused.value && !autoScroll.value) {
-      // Simply don't scroll - let new messages appear below without moving viewport
       return
     }
 
-    // Only auto-scroll if we're following the chat
     if (autoScroll.value && !isPaused.value) {
       await scrollToBottom(false)
     }
@@ -194,8 +253,80 @@ const { data } = await useFetch(
 )
 if (!token.value) console.warn('[chatview] Missing ?token=')
 
-// ✅ Check if scroll pause is enabled for this project
 const scrollPauseEnabled = computed(() => data.value?.enableScrollPause !== false)
+
+/* === Logging Controls === */
+function startLogging() {
+  isLogging.value = true
+  loggingMessages.value = []
+  sessionStartTime.value = Date.now()
+
+  durationInterval = setInterval(() => {
+    const elapsed = Date.now() - sessionStartTime.value
+    const hours = Math.floor(elapsed / 3600000)
+    const minutes = Math.floor((elapsed % 3600000) / 60000)
+    const seconds = Math.floor((elapsed % 60000) / 1000)
+    sessionDuration.value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  }, 1000)
+}
+
+function stopLogging() {
+  isLogging.value = false
+  if (durationInterval) {
+    clearInterval(durationInterval)
+    durationInterval = null
+  }
+}
+
+function logMessage(msg) {
+  if (!isLogging.value) return
+
+  loggingMessages.value.push({
+    timestamp: new Date().toISOString(),
+    platform: msg.platform,
+    user: msg.user,
+    message: msg.html?.replace(/<[^>]*>/g, '') || '',
+    country: msg.country || '',
+    color: msg.color || '',
+  })
+}
+
+function downloadJSON() {
+  const data = {
+    sessionStart: new Date(sessionStartTime.value).toISOString(),
+    sessionDuration: sessionDuration.value,
+    messageCount: loggingMessages.value.length,
+    messages: loggingMessages.value,
+  }
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `chat-log-${new Date(sessionStartTime.value).toISOString().split('T')[0]}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function downloadCSV() {
+  const headers = ['Timestamp', 'Platform', 'User', 'Message', 'Country']
+  const rows = loggingMessages.value.map((m) => [
+    m.timestamp,
+    m.platform,
+    m.user,
+    `"${m.message.replace(/"/g, '""')}"`,
+    m.country,
+  ])
+
+  const csv = [headers, ...rows].map((row) => row.join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `chat-log-${new Date(sessionStartTime.value).toISOString().split('T')[0]}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 /* === User color / icon helpers === */
 const userColorCache = new Map()
@@ -250,14 +381,16 @@ function connectYouTubeSSE(liveVideoId, account) {
   src.onmessage = (e) => {
     const msg = JSON.parse(e.data)
     const cleanUser = msg.user?.replace(/^@/, '') || msg.user
-    messages.value.push({
+    const message = {
       platform: 'youtube',
       country: account.country || '',
       user: cleanUser,
       html: msg.message,
       color: '#ff0000',
       timestamp: msg.timestamp || Date.now(),
-    })
+    }
+    messages.value.push(message)
+    logMessage(message)
   }
   src.onerror = (e) => console.warn('YouTube SSE error', e)
   src.addEventListener('end', () => src.close())
@@ -312,7 +445,7 @@ watchEffect(async () => {
       )
       const country = platformData?.country || ''
       const color = tags.color || getUserColor(tags.username)
-      messages.value.push({
+      const msg = {
         platform: 'twitch',
         country,
         channel,
@@ -320,7 +453,9 @@ watchEffect(async () => {
         color,
         html,
         timestamp: Date.now(),
-      })
+      }
+      messages.value.push(msg)
+      logMessage(msg)
     })
     onBeforeUnmount(() => client.disconnect())
   }
@@ -345,14 +480,16 @@ watchEffect(async () => {
         if (recent.has(key)) return
         recent.add(key)
         if (recent.size > 200) recent.delete(recent.values().next().value)
-        messages.value.push({
+        const message = {
           platform: 'tiktok',
           country: account.country || '',
           user: msg.user,
           html: msg.message,
           color: msg.color,
           timestamp: msg.timestamp,
-        })
+        }
+        messages.value.push(message)
+        logMessage(message)
       }
       src.onerror = () => {
         src.close()
@@ -387,12 +524,10 @@ watchEffect(async () => {
   overflow-y: auto;
   pointer-events: auto;
   padding: 1rem;
-  /* ✅ Show scrollbar by default */
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 
-/* ✅ Disable scrolling when scrollable=false */
 .chat-scroll.scroll-disabled {
   overflow-y: hidden;
 }
@@ -518,5 +653,85 @@ watchEffect(async () => {
 :global(body) {
   overflow: hidden;
   height: 100%;
+}
+
+/* === Logging Controls Panel === */
+.controls-panel {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  width: 280px;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: white;
+  pointer-events: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
+.controls-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.controls-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.controls-body {
+  padding: 1rem;
+}
+
+.controls-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0;
+  font-size: 0.85rem;
+}
+
+.stat-label {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.stat-value {
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+}
+
+.stat-value.recording {
+  color: #ff4444;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.download-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.download-buttons .v-btn {
+  flex: 1;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 </style>
