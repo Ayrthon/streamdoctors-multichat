@@ -1,67 +1,172 @@
 <template>
-  <div class="chat-overlay">
-    <div v-for="(msg, i) in messages" :key="i" class="chat-line d-flex align-center ga-2">
-      <!-- Generic platform icon -->
-      <v-icon
-        v-if="msg.platform && platformIcons[msg.platform]"
-        :icon="platformIcons[msg.platform]"
-        :class="platformColor(msg.platform)"
-        size="20"
-      />
-
-      <!-- TikTok custom icon (fallback) -->
-      <img
-        v-else-if="msg.platform === 'tiktok'"
-        src="assets/icons/tiktok.svg"
-        alt="TikTok"
-        class="icon-svg"
-      />
-
-      <!-- Country flag -->
-      <span v-if="msg.country" class="flag">{{ countryFlag(msg.country) }}</span>
-
-      <!-- Username + message -->
-      <div class="chat-msg">
-        <strong :style="{ color: msg.color }">{{ msg.user }}</strong>
-        <span class="colon">: </span>
-        <span class="text" v-html="msg.html"></span>
+  <div class="chat-container">
+    <div ref="scrollContainer" class="chat-scroll" @scroll="onScroll">
+      <div class="chat-inner">
+        <div v-for="(msg, i) in messages" :key="i" class="chat-line d-flex align-center ga-2">
+          <v-icon
+            v-if="msg.platform && platformIcons[msg.platform]"
+            :icon="platformIcons[msg.platform]"
+            :class="platformColor(msg.platform)"
+            size="20"
+          />
+          <img
+            v-else-if="msg.platform === 'tiktok'"
+            src="assets/icons/tiktok.svg"
+            alt="TikTok"
+            class="icon-svg"
+          />
+          <span v-if="msg.country" class="flag">{{ countryFlag(msg.country) }}</span>
+          <div class="chat-msg">
+            <strong :style="{ color: msg.color }">{{ msg.user }}</strong>
+            <span class="colon">: </span>
+            <span class="text" v-html="msg.html"></span>
+          </div>
+        </div>
       </div>
     </div>
+
+    <transition name="fade">
+      <v-btn v-if="isPaused" class="paused-button" color="primary" @click="resumeChat">
+        Chat paused — click to resume
+      </v-btn>
+    </transition>
   </div>
 </template>
 
 <script setup>
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 
 import tmi from 'tmi.js'
 
-definePageMeta({
-  layout: false,
-  middleware: [],
-})
+definePageMeta({ layout: false })
 
+/* === Routing / token === */
 const route = useRoute()
-
-// 🔑 Token from URL
 const token = computed(() => route.query.token)
 
-// 🧠 Fetch project data
-const {
-  data,
-  pending,
-  error: fetchError,
-} = await useFetch(
-  () => (token.value ? `/api/chatview?token=${encodeURIComponent(token.value)}` : null),
-  { key: () => `chatview:${token.value || 'none'}` }
-)
-
-if (!token.value) console.warn('[chatview] Missing ?token=')
-
+/* === Data === */
 const projectId = ref(null)
 const platforms = ref([])
 const messages = ref([])
 
-// 🎨 Username color generator
+/* === Scroll state === */
+const scrollContainer = ref(null)
+const isPaused = ref(false)
+const autoScroll = ref(true)
+const userInteracted = ref(false)
+let lastScrollTop = 0
+let userIntentTimeout = null
+let scrollCheckTimeout = null
+
+/* Check if scrolled to bottom */
+function isAtBottom(el, threshold = 10) {
+  if (!el) return false
+  const scrollBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+  return scrollBottom <= threshold
+}
+
+/* Scroll to bottom */
+async function scrollToBottom(smooth = false) {
+  await nextTick()
+  const el = scrollContainer.value
+  if (!el) return
+  if (smooth) {
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  } else {
+    el.scrollTop = el.scrollHeight
+  }
+}
+
+/* Mark real user interaction */
+function markUserIntent() {
+  userInteracted.value = true
+  clearTimeout(userIntentTimeout)
+  userIntentTimeout = setTimeout(() => {
+    userInteracted.value = false
+  }, 800)
+}
+
+/* Scroll handler */
+function onScroll() {
+  const el = scrollContainer.value
+  if (!el) return
+
+  const currentTop = el.scrollTop
+  const atBottom = isAtBottom(el)
+  const scrollingUp = currentTop < lastScrollTop - 2
+
+  lastScrollTop = currentTop
+
+  // Only respond to real user interactions
+  if (!userInteracted.value) return
+
+  // Pause when user scrolls up away from bottom
+  if (scrollingUp && !atBottom) {
+    isPaused.value = true
+    autoScroll.value = false
+  }
+
+  // Resume when user manually scrolls to bottom
+  if (atBottom && isPaused.value) {
+    isPaused.value = false
+    autoScroll.value = true
+  }
+}
+
+/* Resume button handler */
+async function resumeChat() {
+  isPaused.value = false
+  autoScroll.value = true
+  await scrollToBottom(true)
+}
+
+/* Lifecycle */
+onMounted(async () => {
+  await scrollToBottom(false)
+  const el = scrollContainer.value
+  if (!el) return
+
+  lastScrollTop = el.scrollTop
+
+  // Mark user interactions
+  el.addEventListener('wheel', markUserIntent, { passive: true })
+  el.addEventListener('touchstart', markUserIntent, { passive: true })
+  el.addEventListener('touchmove', markUserIntent, { passive: true })
+  el.addEventListener('mousedown', markUserIntent, { passive: true })
+})
+
+onBeforeUnmount(() => {
+  clearTimeout(userIntentTimeout)
+  clearTimeout(scrollCheckTimeout)
+})
+
+/* Auto-scroll new messages - ONLY when not paused */
+watch(
+  () => messages.value.length,
+  async (newLength, oldLength) => {
+    // Skip initial load
+    if (oldLength === 0) {
+      await scrollToBottom(false)
+      return
+    }
+
+    // Only auto-scroll if we're following the chat
+    if (autoScroll.value && !isPaused.value) {
+      await scrollToBottom(false)
+    }
+    // Otherwise, stay where we are (viewport locked for reading)
+  }
+)
+
+/* === Fetch project data === */
+const { data } = await useFetch(
+  () => (token.value ? `/api/chatview?token=${encodeURIComponent(token.value)}` : null),
+  { key: () => `chatview:${token.value || 'none'}` }
+)
+if (!token.value) console.warn('[chatview] Missing ?token=')
+
+/* === User color / icon helpers === */
 const userColorCache = new Map()
 function getUserColor(username) {
   if (userColorCache.has(username)) return userColorCache.get(username)
@@ -82,60 +187,38 @@ function getUserColor(username) {
   userColorCache.set(username, color)
   return color
 }
-
-// --- ICON + FLAG helpers ---
-const platformIcons = {
-  twitch: 'mdi-twitch',
-  youtube: 'mdi-youtube',
-  instagram: 'mdi-instagram',
-}
-
-const platformColor = (platform) => {
-  switch (platform) {
-    case 'twitch':
-      return 'text-purple'
-    case 'youtube':
-      return 'text-red'
-    case 'instagram':
-      return 'text-pink'
-    case 'tiktok':
-      return 'text-cyan'
-    default:
-      return ''
-  }
-}
+const platformIcons = { twitch: 'mdi-twitch', youtube: 'mdi-youtube', instagram: 'mdi-instagram' }
+const platformColor = (p) =>
+  p === 'twitch'
+    ? 'text-purple'
+    : p === 'youtube'
+      ? 'text-red'
+      : p === 'instagram'
+        ? 'text-pink'
+        : p === 'tiktok'
+          ? 'text-cyan'
+          : ''
 
 function countryFlag(code) {
   if (!code) return ''
-  return code
-    .toUpperCase()
-    .replace(/./g, (char) => String.fromCodePoint(127397 + char.charCodeAt(0)))
+  return code.toUpperCase().replace(/./g, (ch) => String.fromCodePoint(127397 + ch.charCodeAt(0)))
 }
 
-// 🧩 YouTube live helper
-async function getLiveId(channelHandle) {
+/* === YouTube === */
+async function getLiveId(handle) {
   try {
-    const res = await $fetch('/api/youtube-liveid', { params: { handle: channelHandle } })
-    if (res?.liveVideoId) return res.liveVideoId
-    console.warn('YouTube: No live stream for', channelHandle)
-    return null
+    const res = await $fetch('/api/youtube-liveid', { params: { handle } })
+    return res?.liveVideoId || null
   } catch (e) {
-    console.warn('Could not fetch liveId for', channelHandle, e)
+    console.warn('Could not fetch liveId for', handle, e)
     return null
   }
 }
-
-// 🧩 Connect YouTube SSE
 function connectYouTubeSSE(liveVideoId, account) {
-  const source = new EventSource(`/api/youtube-chat/${liveVideoId}`)
-  console.log('youtube' + source)
-
-  source.onmessage = (e) => {
+  const src = new EventSource(`/api/youtube-chat/${liveVideoId}`)
+  src.onmessage = (e) => {
     const msg = JSON.parse(e.data)
-
-    // 🧹 Remove "@" from YouTube usernames
     const cleanUser = msg.user?.replace(/^@/, '') || msg.user
-
     messages.value.push({
       platform: 'youtube',
       country: account.country || '',
@@ -144,79 +227,61 @@ function connectYouTubeSSE(liveVideoId, account) {
       color: '#ff0000',
       timestamp: msg.timestamp || Date.now(),
     })
-
     if (messages.value.length > 100) messages.value.shift()
   }
-
-  source.addEventListener('end', () => {
-    console.log('YouTube chat stream ended for', account.username)
-    source.close()
-  })
-
-  source.onerror = (e) => console.warn('YouTube SSE error', e)
-
-  onBeforeUnmount(() => source.close())
+  src.onerror = (e) => console.warn('YouTube SSE error', e)
+  src.addEventListener('end', () => src.close())
+  onBeforeUnmount(() => src.close())
 }
 
-// 🔥 Connect all platforms
+/* === Connect platforms === */
 watchEffect(async () => {
   if (import.meta.server) return
   if (!data.value?.platforms?.length) return
 
   platforms.value = data.value.platforms
-  const sources = [] // store all EventSources for cleanup
+  const sources = []
 
-  // 🟣 Twitch
+  /* Twitch */
   const twitchAccounts = platforms.value
     .filter((p) => p.type === 'twitch')
     .map((p) => p.username.toLowerCase())
-
   if (twitchAccounts.length) {
-    const client = new tmi.Client({
-      options: { debug: false },
-      connection: { reconnect: true },
-      channels: twitchAccounts,
-    })
+    const client = new tmi.Client({ connection: { reconnect: true }, channels: twitchAccounts })
     client.connect()
-
-    function parseTwitchEmotes(message, emotes) {
-      if (!emotes) return escapeHtml(message)
-      const replacements = []
-      Object.entries(emotes).forEach(([id, positions]) => {
-        positions.forEach((pos) => {
-          const [start, end] = pos.split('-').map(Number)
-          const code = message.substring(start, end + 1)
-          replacements.push({ start, end, id, code })
+    const escapeHtml = (s) =>
+      s.replace(
+        /[&<>\"']/g,
+        (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[c]
+      )
+    const parseEmotes = (msg, emotes) => {
+      if (!emotes) return escapeHtml(msg)
+      const reps = []
+      Object.entries(emotes).forEach(([id, positions]) =>
+        positions.forEach((p) => {
+          const [a, b] = p.split('-').map(Number)
+          const code = msg.substring(a, b + 1)
+          reps.push({ a, b, id, code })
         })
-      })
-      replacements.sort((a, b) => b.start - a.start)
-      let result = message
-      for (const { start, end, id, code } of replacements) {
-        const img = `<img src="https://static-cdn.jtvnw.net/emoticons/v2/${id}/default/dark/1.0" alt="${code}" class="emote" />`
-        result = result.slice(0, start) + img + result.slice(end + 1)
-      }
-      return result
+      )
+      reps.sort((a, b) => b.a - a.a)
+      let res = msg
+      for (const { a, b, id, code } of reps)
+        res =
+          res.slice(0, a) +
+          `<img src="https://static-cdn.jtvnw.net/emoticons/v2/${id}/default/dark/1.0" alt="${code}" class="emote"/>` +
+          res.slice(b + 1)
+      return res
     }
-
-    function escapeHtml(str) {
-      return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;')
-    }
-
     client.on('message', (channel, tags, message, self) => {
       if (self) return
-      const html = parseTwitchEmotes(message, tags.emotes)
+      const html = parseEmotes(message, tags.emotes)
       const platformData = platforms.value.find(
         (p) =>
           p.type === 'twitch' && p.username.toLowerCase() === channel.replace('#', '').toLowerCase()
       )
       const country = platformData?.country || ''
       const color = tags.color || getUserColor(tags.username)
-
       messages.value.push({
         platform: 'twitch',
         country,
@@ -226,54 +291,31 @@ watchEffect(async () => {
         html,
         timestamp: Date.now(),
       })
-
       if (messages.value.length > 100) messages.value.shift()
     })
-
     onBeforeUnmount(() => client.disconnect())
   }
 
-  // 🔴 YouTube
+  /* YouTube */
   const youtubeAccounts = platforms.value.filter((p) => p.type === 'youtube')
-
   for (const account of youtubeAccounts) {
-    console.log(`🔍 Checking YouTube handle: ${account.username}`)
     const liveId = await getLiveId(account.username)
-
-    if (!liveId) {
-      console.warn(`❌ No liveId found for ${account.username}`)
-      continue
-    }
-
-    console.log(`✅ Connecting YouTube SSE for ${account.username} (videoId: ${liveId})`)
-    connectYouTubeSSE(liveId, account)
+    if (liveId) connectYouTubeSSE(liveId, account)
   }
 
-  // 🖤 TikTok
+  /* TikTok */
   const tiktokAccounts = platforms.value.filter((p) => p.type === 'tiktok')
   for (const account of tiktokAccounts) {
     const username = account.username.toLowerCase()
-    let source = new EventSource(`https://tiktok-relay.onrender.com/tiktok/${username}/sse`)
-
-    const setupTikTokSource = () => {
-      // 🧠 Local deduplication cache (per platform)
-      const recentTikTokMsgs = new Set()
-      const MAX_TIKTOK_CACHE = 200
-
-      source.onmessage = (e) => {
+    let src = new EventSource(`https://tiktok-relay.onrender.com/tiktok/${username}/sse`)
+    const setup = () => {
+      const recent = new Set()
+      src.onmessage = (e) => {
         const msg = JSON.parse(e.data)
-
-        // Build a simple dedupe key (username + message)
         const key = `${msg.user}-${msg.message}`
-        if (recentTikTokMsgs.has(key)) return
-        recentTikTokMsgs.add(key)
-
-        // Limit cache size
-        if (recentTikTokMsgs.size > MAX_TIKTOK_CACHE) {
-          const first = recentTikTokMsgs.values().next()
-          if (!first.done) recentTikTokMsgs.delete(first.value)
-        }
-
+        if (recent.has(key)) return
+        recent.add(key)
+        if (recent.size > 200) recent.delete(recent.values().next().value)
         messages.value.push({
           platform: 'tiktok',
           country: account.country || '',
@@ -282,65 +324,86 @@ watchEffect(async () => {
           color: msg.color,
           timestamp: msg.timestamp,
         })
-
         if (messages.value.length > 100) messages.value.shift()
       }
-
-      source.onerror = () => {
-        console.warn(`TikTok SSE error for ${username}, retrying in 5s...`)
-        source.close()
+      src.onerror = () => {
+        src.close()
         setTimeout(() => {
-          source = new EventSource(`https://tiktok-relay.onrender.com/tiktok/${username}/sse`)
-          setupTikTokSource()
+          src = new EventSource(`https://tiktok-relay.onrender.com/tiktok/${username}/sse`)
+          setup()
         }, 5000)
       }
-
-      source.addEventListener('end', () => {
-        console.log(`TikTok chat stream ended for ${username}`)
-        source.close()
-      })
     }
-
-    setupTikTokSource()
-    sources.push(source)
+    setup()
+    sources.push(src)
   }
 
-  onBeforeUnmount(() => {
-    sources.forEach((s) => s.close())
-  })
+  onBeforeUnmount(() => sources.forEach((s) => s.close()))
 })
 </script>
 
 <style scoped>
-.chat-overlay {
+.chat-container {
   position: fixed;
   inset: 0;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
   background: transparent;
   color: white;
-  padding: 1rem;
   font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
-  height: 100vh;
   pointer-events: none;
-  text-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
 }
 
-/* === TWITCH-AUTHENTIC CHAT LINE === */
+.chat-scroll {
+  flex: 1;
+  overflow-y: auto;
+  pointer-events: auto;
+  padding: 1rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.chat-inner {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  justify-content: flex-end;
+}
+
+/* Pause button */
+.paused-button {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* Fade transition */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* === Chat line styling === */
 .chat-line {
   display: flex;
   align-items: flex-start;
-  gap: 0.32rem; /* slightly tighter than 0.4 for Twitch-like density */
-  font-size: 1.9rem; /* Twitch uses ~19px base */
-  line-height: 1.35; /* true Twitch vertical rhythm */
+  gap: 0.32rem;
+  font-size: 1.9rem;
+  line-height: 1.35;
   letter-spacing: -0.01em;
   opacity: 0.95;
   animation: fade-in 0.25s ease forwards;
-  margin-bottom: 0.1rem; /* micro gap between messages */
+  margin-bottom: 0.1rem;
 }
 
-/* username + colon stay glued */
 .chat-line strong {
   white-space: nowrap;
   display: inline-block;
@@ -348,7 +411,6 @@ watchEffect(async () => {
   font-weight: 600;
 }
 
-/* message text area */
 .chat-line span[v-html] {
   display: inline;
   word-break: break-word;
@@ -358,7 +420,6 @@ watchEffect(async () => {
   align-self: flex-start;
 }
 
-/* === ICON + FLAG BASELINE ALIGNMENT === */
 .chat-line :deep(.v-icon),
 .chat-line .icon-svg,
 .chat-line .flag {
@@ -367,10 +428,9 @@ watchEffect(async () => {
   width: 0.95em;
   height: 0.95em;
   vertical-align: baseline;
-  transform: translateY(0.15em); /* perfect baseline */
+  transform: translateY(0.15em);
 }
 
-/* platform icons */
 .chat-line :deep(.v-icon) {
   font-size: 0.95em !important;
   line-height: 1;
@@ -380,26 +440,22 @@ watchEffect(async () => {
   height: 1em;
 }
 
-/* TikTok fallback icon */
 .chat-line .icon-svg {
   filter: brightness(0) invert(1);
 }
 
-/* flag (same height as icon) */
 .chat-line .flag {
   font-size: 0.95em;
   line-height: 1;
   margin-right: 0.05rem;
 }
 
-/* emotes */
 .emote {
   vertical-align: middle;
   height: 1.5em;
   margin: 0 0.1em;
 }
 
-/* platform colors */
 .text-purple {
   color: #9146ff !important;
 }
@@ -413,7 +469,6 @@ watchEffect(async () => {
   color: #00f2ea !important;
 }
 
-/* animation */
 @keyframes fade-in {
   from {
     opacity: 0;
