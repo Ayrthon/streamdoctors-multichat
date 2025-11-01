@@ -110,6 +110,40 @@
 
       <div class="controls-body">
         <div v-if="!isCounting" class="controls-section">
+          <div class="character-inputs">
+            <div
+              v-for="(charItem, index) in charactersToCount"
+              :key="charItem.id"
+              class="input-group"
+            >
+              <label>Character {{ index + 1 }}:</label>
+              <input
+                v-model="charItem.char"
+                type="text"
+                maxlength="1"
+                class="char-input"
+                :placeholder="(index + 1).toString()"
+              />
+              <v-btn
+                v-if="charactersToCount.length > 1"
+                icon="mdi-minus-circle"
+                size="x-small"
+                color="error"
+                variant="text"
+                @click="removeCharacter(charItem.id)"
+              />
+            </div>
+          </div>
+          <v-btn
+            color="secondary"
+            size="small"
+            variant="tonal"
+            prepend-icon="mdi-plus-circle"
+            @click="addCharacter"
+            class="mb-2"
+          >
+            Add Character
+          </v-btn>
           <v-btn color="primary" block prepend-icon="mdi-counter" @click="startCounting">
             Start Counting
           </v-btn>
@@ -122,17 +156,13 @@
           </div>
 
           <div class="character-counts">
-            <div class="count-item">
-              <span class="char-label">Character '1':</span>
-              <span class="char-value">{{ characterCounts['1'] }}</span>
-            </div>
-            <div class="count-item">
-              <span class="char-label">Character '2':</span>
-              <span class="char-value">{{ characterCounts['2'] }}</span>
-            </div>
-            <div class="count-item">
-              <span class="char-label">Character '3':</span>
-              <span class="char-value">{{ characterCounts['3'] }}</span>
+            <div
+              v-for="(charItem, index) in charactersToCount"
+              :key="charItem.id"
+              class="count-item"
+            >
+              <span class="char-label">Character '{{ charItem.char }}':</span>
+              <span class="char-value">{{ charItem.count }}</span>
             </div>
           </div>
 
@@ -178,14 +208,14 @@ let durationInterval = null
 
 /* === Character Counter State === */
 const isCounting = ref(false)
-const characterCounts = ref({
-  1: 0,
-  2: 0,
-  3: 0,
-})
+const charactersToCount = ref([
+  { id: 1, char: '1', count: 0 },
+  { id: 2, char: '2', count: 0 },
+])
+let nextCharId = 3
 
 const totalCharacterCount = computed(() => {
-  return characterCounts.value['1'] + characterCounts.value['2'] + characterCounts.value['3']
+  return charactersToCount.value.reduce((sum, item) => sum + item.count, 0)
 })
 
 /* === Scroll state === */
@@ -350,9 +380,26 @@ function logMessage(msg) {
 }
 
 /* === Character Counter Controls === */
+function addCharacter() {
+  charactersToCount.value.push({
+    id: nextCharId++,
+    char: '',
+    count: 0,
+  })
+}
+
+function removeCharacter(id) {
+  if (charactersToCount.value.length > 1) {
+    charactersToCount.value = charactersToCount.value.filter((item) => item.id !== id)
+  }
+}
+
 function startCounting() {
   isCounting.value = true
-  characterCounts.value = { 1: 0, 2: 0, 3: 0 }
+  // Reset all counts to 0 when starting
+  charactersToCount.value.forEach((item) => {
+    item.count = 0
+  })
 }
 
 function stopCounting() {
@@ -360,7 +407,9 @@ function stopCounting() {
 }
 
 function resetCounter() {
-  characterCounts.value = { 1: 0, 2: 0, 3: 0 }
+  charactersToCount.value.forEach((item) => {
+    item.count = 0
+  })
 }
 
 function countCharactersInMessage(text) {
@@ -370,9 +419,11 @@ function countCharactersInMessage(text) {
   const cleanText = text.replace(/<[^>]*>/g, '')
 
   for (let char of cleanText) {
-    if (char === '1') characterCounts.value['1']++
-    else if (char === '2') characterCounts.value['2']++
-    else if (char === '3') characterCounts.value['3']++
+    for (let item of charactersToCount.value) {
+      if (char === item.char) {
+        item.count++
+      }
+    }
   }
 }
 
@@ -967,6 +1018,52 @@ watchEffect(async () => {
 }
 
 /* Character counter specific styles */
+.character-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.input-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.input-group label {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+  min-width: 90px;
+  flex-shrink: 0;
+}
+
+.char-input {
+  width: 50px;
+  height: 35px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: white;
+  text-align: center;
+  font-size: 1.2rem;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  transition: all 0.2s ease;
+}
+
+.char-input:focus {
+  outline: none;
+  border-color: #4fc3f7;
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 0 2px rgba(79, 195, 247, 0.2);
+}
+
+.char-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
 .character-counts {
   display: flex;
   flex-direction: column;
