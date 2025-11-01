@@ -72,7 +72,7 @@
             color="error"
             block
             prepend-icon="mdi-stop-circle"
-            @click="stopLogging"
+            @click="showStopDialog = true"
             class="mt-2"
           >
             Stop Logging
@@ -96,6 +96,49 @@
               :disabled="loggingMessages.length === 0"
             >
               CSV
+            </v-btn>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stop Logging Confirmation Dialog -->
+    <div v-if="showStopDialog" class="confirmation-overlay" @click="showStopDialog = false">
+      <div class="confirmation-dialog" @click.stop>
+        <div class="confirmation-header">
+          <span>⚠️ Stop Logging?</span>
+        </div>
+        <div class="confirmation-body">
+          <p>
+            You have <strong>{{ loggingMessages.length }} messages</strong> logged.
+          </p>
+          <p>Download your data before stopping, or it will be lost.</p>
+
+          <div class="dialog-download-buttons">
+            <v-btn
+              color="primary"
+              block
+              prepend-icon="mdi-download"
+              @click="downloadJSON"
+              class="mb-2"
+            >
+              Download JSON
+            </v-btn>
+            <v-btn
+              color="primary"
+              block
+              prepend-icon="mdi-download"
+              @click="downloadCSV"
+              class="mb-3"
+            >
+              Download CSV
+            </v-btn>
+          </div>
+
+          <div class="dialog-actions">
+            <v-btn variant="text" @click="showStopDialog = false"> Cancel </v-btn>
+            <v-btn color="error" variant="flat" @click="confirmStopLogging">
+              Stop Without Saving
             </v-btn>
           </div>
         </div>
@@ -235,6 +278,7 @@ const isLogging = ref(false)
 const loggingMessages = ref([])
 const sessionStartTime = ref(null)
 const sessionDuration = ref('00:00:00')
+const showStopDialog = ref(false)
 let durationInterval = null
 
 /* === Character Counter State === */
@@ -682,6 +726,11 @@ function stopLogging() {
     clearInterval(durationInterval)
     durationInterval = null
   }
+}
+
+function confirmStopLogging() {
+  showStopDialog.value = false
+  stopLogging()
 }
 
 function logMessage(msg) {
@@ -1442,6 +1491,67 @@ watchEffect(async () => {
   z-index: 10000;
   backdrop-filter: blur(4px);
   pointer-events: auto;
+}
+
+/* Confirmation Dialog Styles */
+.confirmation-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+
+.confirmation-dialog {
+  background: rgba(20, 20, 20, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.confirmation-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #ffcc00;
+}
+
+.confirmation-body {
+  padding: 1.5rem;
+}
+
+.confirmation-body p {
+  margin: 0 0 1rem 0;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.5;
+}
+
+.confirmation-body p:last-of-type {
+  margin-bottom: 1.5rem;
+}
+
+.confirmation-body strong {
+  color: #4fc3f7;
+  font-weight: 600;
+}
+
+.dialog-download-buttons {
+  margin-bottom: 1rem;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .emoji-picker {
