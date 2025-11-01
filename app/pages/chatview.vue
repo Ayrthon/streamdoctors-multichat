@@ -43,8 +43,10 @@
 
     <!-- Logging Controls Panel -->
     <div
+      ref="loggingPanelRef"
       v-if="showControls"
       class="controls-panel"
+      :class="{ 'mobile-logging': true }"
       :style="{
         left: loggingPanelInitialized ? `${loggingPanelPos.x}px` : '300px',
         top: loggingPanelInitialized ? `${loggingPanelPos.y}px` : '1rem',
@@ -53,14 +55,27 @@
       }"
       @mousedown="bringLoggingToFront"
     >
-      <div class="controls-header draggable-handle" @mousedown="startDragLogging">
+      <div
+        class="controls-header draggable-handle"
+        @mousedown="startDragLogging"
+        @touchstart="startDragLogging"
+      >
         <span class="controls-title">
           <span class="drag-icon">⋮⋮</span>
           📝 Chat Logging
         </span>
+        <v-btn
+          icon
+          size="x-small"
+          variant="text"
+          @click.stop="isLoggingCollapsed = !isLoggingCollapsed"
+          class="collapse-btn"
+        >
+          <v-icon>{{ isLoggingCollapsed ? 'mdi-chevron-down' : 'mdi-chevron-up' }}</v-icon>
+        </v-btn>
       </div>
 
-      <div class="controls-body">
+      <div v-if="!isLoggingCollapsed" class="controls-body">
         <div v-if="!isLogging" class="controls-section">
           <v-btn color="success" block prepend-icon="mdi-record-circle" @click="startLogging">
             Start Logging
@@ -160,8 +175,10 @@
 
     <!-- Character Counter Panel -->
     <div
+      ref="counterPanelRef"
       v-if="showControls"
       class="counter-panel"
+      :class="{ 'mobile-counter': true }"
       :style="{
         left: counterPanelInitialized ? `${counterPanelPos.x}px` : '1rem',
         top: counterPanelInitialized ? `${counterPanelPos.y}px` : '1rem',
@@ -169,14 +186,27 @@
       }"
       @mousedown="bringCounterToFront"
     >
-      <div class="controls-header draggable-handle" @mousedown="startDragCounter">
+      <div
+        class="controls-header draggable-handle"
+        @mousedown="startDragCounter"
+        @touchstart="startDragCounter"
+      >
         <span class="controls-title">
           <span class="drag-icon">⋮⋮</span>
           🔢 Character Counter
         </span>
+        <v-btn
+          icon
+          size="x-small"
+          variant="text"
+          @click.stop="isCounterCollapsed = !isCounterCollapsed"
+          class="collapse-btn"
+        >
+          <v-icon>{{ isCounterCollapsed ? 'mdi-chevron-down' : 'mdi-chevron-up' }}</v-icon>
+        </v-btn>
       </div>
 
-      <div class="controls-body">
+      <div v-if="!isCounterCollapsed" class="controls-body">
         <div v-if="!isCounting" class="controls-section">
           <div class="character-inputs">
             <div
@@ -304,6 +334,7 @@ const loggingMessages = ref([])
 const sessionStartTime = ref(null)
 const sessionDuration = ref('00:00:00')
 const showStopDialog = ref(false)
+const isLoggingCollapsed = ref(false)
 let durationInterval = null
 
 /* === Draggable Panels State === */
@@ -316,9 +347,12 @@ const isDraggingCounter = ref(false)
 const dragOffset = ref({ x: 0, y: 0 })
 const loggingPanelZIndex = ref(1000)
 const counterPanelZIndex = ref(1000)
+const counterPanelRef = ref(null)
+const loggingPanelRef = ref(null)
 
 /* === Character Counter State === */
 const isCounting = ref(false)
+const isCounterCollapsed = ref(false)
 const charactersToCount = ref([
   { id: 1, char: '1', count: 0 },
   { id: 2, char: '2', count: 0 },
@@ -616,6 +650,15 @@ const totalCharacterCount = computed(() => {
   return charactersToCount.value.reduce((sum, item) => sum + item.count, 0)
 })
 
+// Calculate logging panel position on mobile based on counter panel height
+const loggingPanelMobileTop = computed(() => {
+  if (import.meta.client && window.innerWidth <= 768 && counterPanelRef.value) {
+    const counterHeight = counterPanelRef.value.offsetHeight
+    return `${counterHeight + 16}px` // 16px = 0.5rem gap + 0.5rem top margin
+  }
+  return '0.5rem'
+})
+
 /* === Scroll state === */
 const scrollContainer = ref(null)
 const isPaused = ref(false)
@@ -698,9 +741,49 @@ onMounted(async () => {
   el.addEventListener('touchmove', markUserIntent, { passive: true })
   el.addEventListener('mousedown', markUserIntent, { passive: true })
 
-  // Add drag event listeners
+  // Add drag event listeners for mouse
   window.addEventListener('mousemove', onDragMove)
   window.addEventListener('mouseup', stopDrag)
+
+  // Add drag event listeners for touch
+  window.addEventListener('touchmove', onDragMove, { passive: false })
+  window.addEventListener('touchend', stopDrag)
+
+  // Position logging panel on mobile after mount
+  positionLoggingPanelMobile()
+})
+
+function positionLoggingPanelMobile() {
+  if (typeof window === 'undefined') return
+  if (window.innerWidth > 768) return
+
+  nextTick(() => {
+    if (counterPanelRef.value && loggingPanelRef.value) {
+      // Small delay to ensure DOM has updated after collapse/expand
+      setTimeout(() => {
+        const counterRect = counterPanelRef.value.getBoundingClientRect()
+        const newTop = counterRect.bottom + 8 // 8px gap
+        loggingPanelRef.value.style.setProperty('top', `${newTop}px`, 'important')
+      }, 50)
+    }
+  })
+}
+
+// Watch for changes that affect panel heights on mobile
+watch(
+  [isCounterCollapsed, () => charactersToCount.value.length],
+  () => {
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+      positionLoggingPanelMobile()
+    }
+  },
+  { flush: 'post' }
+)
+
+// Separate watcher for logging collapse that doesn't reposition
+watch(isLoggingCollapsed, () => {
+  // Don't reposition when logging panel itself is collapsing
+  // Only the counter panel changes affect logging position
 })
 
 onBeforeUnmount(() => {
@@ -711,6 +794,8 @@ onBeforeUnmount(() => {
   // Remove drag event listeners
   window.removeEventListener('mousemove', onDragMove)
   window.removeEventListener('mouseup', stopDrag)
+  window.removeEventListener('touchmove', onDragMove)
+  window.removeEventListener('touchend', stopDrag)
 })
 
 /* Auto-scroll new messages - ONLY when not paused */
@@ -825,6 +910,9 @@ function selectEmoji(emoji) {
 
 /* === Draggable Panel Controls === */
 function startDragLogging(e) {
+  // Disable dragging on mobile (screens smaller than 768px)
+  if (window.innerWidth <= 768) return
+
   // Initialize position on first drag if not set
   if (!loggingPanelInitialized.value) {
     const rect = e.currentTarget.parentElement.getBoundingClientRect()
@@ -837,15 +925,26 @@ function startDragLogging(e) {
 
   isDraggingLogging.value = true
   const rect = e.currentTarget.parentElement.getBoundingClientRect()
+
+  // Support both mouse and touch events
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY
+
   dragOffset.value = {
-    x: e.clientX - rect.left,
-    y: e.clientY - rect.top,
+    x: clientX - rect.left,
+    y: clientY - rect.top,
   }
   // Bring to front
   loggingPanelZIndex.value = Math.max(loggingPanelZIndex.value, counterPanelZIndex.value) + 1
+
+  // Prevent default to avoid scrolling on touch
+  if (e.touches) e.preventDefault()
 }
 
 function startDragCounter(e) {
+  // Disable dragging on mobile (screens smaller than 768px)
+  if (window.innerWidth <= 768) return
+
   // Initialize position on first drag if not set
   if (!counterPanelInitialized.value) {
     const rect = e.currentTarget.parentElement.getBoundingClientRect()
@@ -858,19 +957,31 @@ function startDragCounter(e) {
 
   isDraggingCounter.value = true
   const rect = e.currentTarget.parentElement.getBoundingClientRect()
+
+  // Support both mouse and touch events
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY
+
   dragOffset.value = {
-    x: e.clientX - rect.left,
-    y: e.clientY - rect.top,
+    x: clientX - rect.left,
+    y: clientY - rect.top,
   }
   // Bring to front
   counterPanelZIndex.value = Math.max(loggingPanelZIndex.value, counterPanelZIndex.value) + 1
+
+  // Prevent default to avoid scrolling on touch
+  if (e.touches) e.preventDefault()
 }
 
 function onDragMove(e) {
+  // Support both mouse and touch events
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY
+
   if (isDraggingLogging.value) {
     // Calculate new position
-    let newX = e.clientX - dragOffset.value.x
-    let newY = e.clientY - dragOffset.value.y
+    let newX = clientX - dragOffset.value.x
+    let newY = clientY - dragOffset.value.y
 
     // Get panel dimensions (approximate)
     const panelWidth = 280
@@ -885,8 +996,8 @@ function onDragMove(e) {
 
   if (isDraggingCounter.value) {
     // Calculate new position
-    let newX = e.clientX - dragOffset.value.x
-    let newY = e.clientY - dragOffset.value.y
+    let newX = clientX - dragOffset.value.x
+    let newY = clientY - dragOffset.value.y
 
     // Get panel dimensions (approximate)
     const panelWidth = 280
@@ -1385,26 +1496,44 @@ watchEffect(async () => {
 
 /* Mobile optimizations */
 @media (max-width: 768px) {
-  .controls-panel {
-    top: 0.5rem;
-    right: 0.5rem;
-    left: auto;
-    width: auto;
-    max-width: 320px;
+  /* Override inline styles on mobile */
+  .mobile-counter {
+    position: fixed !important;
+    width: calc(100vw - 1rem) !important;
+    max-width: none !important;
+    left: 0.5rem !important;
+    top: 0.5rem !important;
+    right: auto !important;
+    transition: none !important;
   }
 
-  .counter-panel {
-    top: auto;
-    bottom: 0.5rem;
-    left: 0.5rem;
-    right: 0.5rem;
-    width: auto;
-    max-width: 320px;
-    margin: 0 auto;
+  .mobile-logging {
+    position: fixed !important;
+    width: calc(100vw - 1rem) !important;
+    max-width: none !important;
+    left: 0.5rem !important;
+    /* Start below the viewport, will be positioned with JS */
+    top: 50vh !important;
+    right: auto !important;
+    transition: top 0.3s ease !important;
+  }
+
+  /* Disable drag cursor on mobile */
+  .draggable-handle {
+    cursor: default !important;
+  }
+
+  .draggable-handle:hover {
+    background: transparent !important;
+  }
+
+  .draggable-handle:active {
+    cursor: default !important;
   }
 
   .chat-scroll {
     padding: 0.5rem;
+    padding-top: 10rem;
   }
 
   .chat-line {
@@ -1498,6 +1627,14 @@ watchEffect(async () => {
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   font-weight: 600;
   font-size: 0.9rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.collapse-btn {
+  flex-shrink: 0;
+  margin-left: 0.5rem;
 }
 
 .draggable-handle {
