@@ -166,7 +166,7 @@
           <div class="dialog-actions">
             <v-btn variant="text" @click="showStopDialog = false"> Cancel </v-btn>
             <v-btn color="error" variant="flat" @click="confirmStopLogging">
-              Stop Without Saving
+              Stop Logging (delete data)
             </v-btn>
           </div>
         </div>
@@ -1805,7 +1805,7 @@ watchEffect(async () => {
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 12px;
   width: 90%;
-  max-width: 400px;
+  max-width: 450px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
 }
 
