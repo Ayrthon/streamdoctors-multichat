@@ -96,7 +96,7 @@
       <v-switch
         v-model="enableChatLogging"
         color="primary"
-        label="Enable Chat Logging"
+        label="Controls"
         hide-details
         density="compact"
       />
@@ -109,7 +109,7 @@
       variant="outlined"
       append-inner-icon="mdi-content-copy"
       @click:append-inner="copyChatUrlModerator"
-      hint="Chat url for monitoring, scrolling and chatlogging"
+      hint="Chat url for Monitoring, Scrolling, Chatlogging and Character counting"
       persistent-hint
     />
 
@@ -177,7 +177,7 @@ const dialogPlatform = ref({ type: '', country: '', username: '' })
 const platformForm = ref(null)
 
 // ✅ Chat logging toggle
-const enableChatLogging = ref(false)
+const enableChatLogging = ref(true)
 
 const rules = {
   required: (v) => !!v || 'This field is required',
