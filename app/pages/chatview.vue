@@ -101,6 +101,52 @@
         </div>
       </div>
     </div>
+
+    <!-- Character Counter Panel -->
+    <div v-if="showControls" class="counter-panel">
+      <div class="controls-header">
+        <span class="controls-title">🔢 Character Counter</span>
+      </div>
+
+      <div class="controls-body">
+        <div v-if="!isCounting" class="controls-section">
+          <v-btn color="primary" block prepend-icon="mdi-counter" @click="startCounting">
+            Start Counting
+          </v-btn>
+        </div>
+
+        <div v-else class="controls-section">
+          <div class="stat-row">
+            <span class="stat-label">Status:</span>
+            <span class="stat-value counting">🟢 Counting</span>
+          </div>
+
+          <div class="character-counts">
+            <div class="count-item">
+              <span class="char-label">Character '1':</span>
+              <span class="char-value">{{ characterCounts['1'] }}</span>
+            </div>
+            <div class="count-item">
+              <span class="char-label">Character '2':</span>
+              <span class="char-value">{{ characterCounts['2'] }}</span>
+            </div>
+            <div class="count-item">
+              <span class="char-label">Character '3':</span>
+              <span class="char-value">{{ characterCounts['3'] }}</span>
+            </div>
+          </div>
+
+          <div class="button-group mt-2">
+            <v-btn color="warning" size="small" prepend-icon="mdi-refresh" @click="resetCounter">
+              Reset
+            </v-btn>
+            <v-btn color="error" size="small" prepend-icon="mdi-stop-circle" @click="stopCounting">
+              Stop
+            </v-btn>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -129,6 +175,18 @@ const loggingMessages = ref([])
 const sessionStartTime = ref(null)
 const sessionDuration = ref('00:00:00')
 let durationInterval = null
+
+/* === Character Counter State === */
+const isCounting = ref(false)
+const characterCounts = ref({
+  1: 0,
+  2: 0,
+  3: 0,
+})
+
+const totalCharacterCount = computed(() => {
+  return characterCounts.value['1'] + characterCounts.value['2'] + characterCounts.value['3']
+})
 
 /* === Scroll state === */
 const scrollContainer = ref(null)
@@ -291,6 +349,33 @@ function logMessage(msg) {
   })
 }
 
+/* === Character Counter Controls === */
+function startCounting() {
+  isCounting.value = true
+  characterCounts.value = { 1: 0, 2: 0, 3: 0 }
+}
+
+function stopCounting() {
+  isCounting.value = false
+}
+
+function resetCounter() {
+  characterCounts.value = { 1: 0, 2: 0, 3: 0 }
+}
+
+function countCharactersInMessage(text) {
+  if (!isCounting.value) return
+
+  // Strip HTML tags to count only actual text content
+  const cleanText = text.replace(/<[^>]*>/g, '')
+
+  for (let char of cleanText) {
+    if (char === '1') characterCounts.value['1']++
+    else if (char === '2') characterCounts.value['2']++
+    else if (char === '3') characterCounts.value['3']++
+  }
+}
+
 function downloadJSON() {
   const data = {
     sessionStart: new Date(sessionStartTime.value).toISOString(),
@@ -391,6 +476,7 @@ function connectYouTubeSSE(liveVideoId, account) {
     }
     messages.value.push(message)
     logMessage(message)
+    countCharactersInMessage(message.html)
   }
   src.onerror = (e) => console.warn('YouTube SSE error', e)
   src.addEventListener('end', () => src.close())
@@ -456,6 +542,7 @@ watchEffect(async () => {
       }
       messages.value.push(msg)
       logMessage(msg)
+      countCharactersInMessage(msg.html)
     })
     onBeforeUnmount(() => client.disconnect())
   }
@@ -490,6 +577,7 @@ watchEffect(async () => {
         }
         messages.value.push(message)
         logMessage(message)
+        countCharactersInMessage(message.html)
       }
       src.onerror = () => {
         src.close()
@@ -684,12 +772,37 @@ watchEffect(async () => {
   z-index: 1000;
 }
 
+/* === Character Counter Panel === */
+.counter-panel {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  width: 280px;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: white;
+  pointer-events: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
 /* Mobile optimizations */
 @media (max-width: 768px) {
   .controls-panel {
     top: 0.5rem;
     right: 0.5rem;
+    left: auto;
+    width: auto;
+    max-width: 320px;
+  }
+
+  .counter-panel {
+    top: auto;
+    bottom: 0.5rem;
     left: 0.5rem;
+    right: 0.5rem;
     width: auto;
     max-width: 320px;
     margin: 0 auto;
@@ -710,7 +823,8 @@ watchEffect(async () => {
 }
 
 @media (max-width: 480px) {
-  .controls-panel {
+  .controls-panel,
+  .counter-panel {
     width: calc(100vw - 1rem);
     max-width: none;
   }
@@ -760,11 +874,15 @@ watchEffect(async () => {
 
 /* Landscape mobile */
 @media (max-height: 500px) and (orientation: landscape) {
-  .controls-panel {
+  .controls-panel,
+  .counter-panel {
     top: 0.25rem;
-    right: 0.25rem;
     width: 240px;
     font-size: 0.85rem;
+  }
+
+  .counter-panel {
+    left: 0.25rem;
   }
 
   .controls-header {
@@ -825,6 +943,11 @@ watchEffect(async () => {
   animation: pulse 2s ease-in-out infinite;
 }
 
+.stat-value.counting {
+  color: #44ff44;
+  animation: pulse 2s ease-in-out infinite;
+}
+
 .download-buttons {
   display: flex;
   gap: 0.5rem;
@@ -832,6 +955,58 @@ watchEffect(async () => {
 
 .download-buttons .v-btn {
   flex: 1;
+}
+
+.button-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.button-group .v-btn {
+  flex: 1;
+}
+
+/* Character counter specific styles */
+.character-counts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+}
+
+.count-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0;
+  font-size: 0.9rem;
+}
+
+.count-item.total {
+  margin-top: 0.25rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  font-weight: 700;
+}
+
+.char-label {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+}
+
+.char-value {
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+  font-size: 1.1em;
+  color: #4fc3f7;
+}
+
+.count-item.total .char-value {
+  color: #ffd700;
+  font-size: 1.2em;
 }
 
 @keyframes pulse {
