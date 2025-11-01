@@ -145,26 +145,6 @@
             </div>
           </div>
 
-          <!-- Emoji Picker Dialog -->
-          <div v-if="showEmojiPicker" class="emoji-picker-overlay" @click="closeEmojiPicker">
-            <div class="emoji-picker" @click.stop>
-              <div class="emoji-picker-header">
-                <span>Select an Emoji</span>
-                <v-btn icon="mdi-close" size="x-small" variant="text" @click="closeEmojiPicker" />
-              </div>
-              <div class="emoji-grid">
-                <button
-                  v-for="emoji in popularEmojis"
-                  :key="emoji"
-                  class="emoji-button"
-                  @click="selectEmoji(emoji)"
-                >
-                  {{ emoji }}
-                </button>
-              </div>
-            </div>
-          </div>
-
           <v-btn
             color="secondary"
             size="small"
@@ -205,6 +185,26 @@
               Stop
             </v-btn>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Emoji Picker Dialog (Global Overlay) -->
+    <div v-if="showEmojiPicker" class="emoji-picker-overlay" @click="closeEmojiPicker">
+      <div class="emoji-picker" @click.stop>
+        <div class="emoji-picker-header">
+          <span>Select an Emoji</span>
+          <v-btn icon="mdi-close" size="x-small" variant="text" @click="closeEmojiPicker" />
+        </div>
+        <div class="emoji-grid">
+          <button
+            v-for="emoji in popularEmojis"
+            :key="emoji"
+            class="emoji-button"
+            @click="selectEmoji(emoji)"
+          >
+            {{ emoji }}
+          </button>
         </div>
       </div>
     </div>
@@ -754,13 +754,38 @@ function countCharactersInMessage(text) {
   // Strip HTML tags to count only actual text content
   const cleanText = text.replace(/<[^>]*>/g, '')
 
-  for (let char of cleanText) {
-    for (let item of charactersToCount.value) {
-      if (char === item.char) {
-        item.count++
-      }
-    }
+  // Iterate through each character to count
+  for (let item of charactersToCount.value) {
+    if (!item.char) continue // Skip empty characters
+
+    // Try multiple matching strategies for emoji compatibility
+    const searchChar = item.char
+
+    // Count occurrences using different methods
+    // Method 1: Direct string search (works for most emojis)
+    const directMatches = (cleanText.match(new RegExp(escapeRegex(searchChar), 'g')) || []).length
+
+    // Method 2: Normalize and compare
+    const normalizedSearch = searchChar.normalize('NFC')
+    const normalizedMatches = (
+      cleanText.normalize('NFC').match(new RegExp(escapeRegex(normalizedSearch), 'g')) || []
+    ).length
+
+    // Method 3: Check without variation selectors
+    const withoutVariation = searchChar.replace(/\uFE0F/g, '')
+    const withoutVariationMatches = (
+      cleanText.replace(/\uFE0F/g, '').match(new RegExp(escapeRegex(withoutVariation), 'g')) || []
+    ).length
+
+    // Use the maximum count found
+    const maxCount = Math.max(directMatches, normalizedMatches, withoutVariationMatches)
+    item.count += maxCount
   }
+}
+
+// Helper function to escape special regex characters
+function escapeRegex(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function downloadJSON() {
@@ -1416,6 +1441,7 @@ watchEffect(async () => {
   justify-content: center;
   z-index: 10000;
   backdrop-filter: blur(4px);
+  pointer-events: auto;
 }
 
 .emoji-picker {
@@ -1424,7 +1450,7 @@ watchEffect(async () => {
   border-radius: 12px;
   width: 90%;
   max-width: 400px;
-  max-height: 500px;
+  max-height: 70vh;
   display: flex;
   flex-direction: column;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
@@ -1438,6 +1464,7 @@ watchEffect(async () => {
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   font-weight: 600;
   font-size: 0.95rem;
+  flex-shrink: 0;
 }
 
 .emoji-grid {
@@ -1446,7 +1473,6 @@ watchEffect(async () => {
   gap: 0.25rem;
   padding: 1rem;
   overflow-y: auto;
-  max-height: 400px;
 }
 
 .emoji-button {
