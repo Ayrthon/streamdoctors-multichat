@@ -42,9 +42,22 @@
     </transition>
 
     <!-- Logging Controls Panel -->
-    <div v-if="showControls" class="controls-panel">
-      <div class="controls-header">
-        <span class="controls-title">📝 Chat Logging</span>
+    <div
+      v-if="showControls"
+      class="controls-panel"
+      :style="{
+        left: loggingPanelInitialized ? `${loggingPanelPos.x}px` : '300px',
+        top: loggingPanelInitialized ? `${loggingPanelPos.y}px` : '1rem',
+        right: loggingPanelInitialized ? 'auto' : 'auto',
+        zIndex: loggingPanelZIndex,
+      }"
+      @mousedown="bringLoggingToFront"
+    >
+      <div class="controls-header draggable-handle" @mousedown="startDragLogging">
+        <span class="controls-title">
+          <span class="drag-icon">⋮⋮</span>
+          📝 Chat Logging
+        </span>
       </div>
 
       <div class="controls-body">
@@ -146,9 +159,21 @@
     </div>
 
     <!-- Character Counter Panel -->
-    <div v-if="showControls" class="counter-panel">
-      <div class="controls-header">
-        <span class="controls-title">🔢 Character Counter</span>
+    <div
+      v-if="showControls"
+      class="counter-panel"
+      :style="{
+        left: counterPanelInitialized ? `${counterPanelPos.x}px` : '1rem',
+        top: counterPanelInitialized ? `${counterPanelPos.y}px` : '1rem',
+        zIndex: counterPanelZIndex,
+      }"
+      @mousedown="bringCounterToFront"
+    >
+      <div class="controls-header draggable-handle" @mousedown="startDragCounter">
+        <span class="controls-title">
+          <span class="drag-icon">⋮⋮</span>
+          🔢 Character Counter
+        </span>
       </div>
 
       <div class="controls-body">
@@ -280,6 +305,17 @@ const sessionStartTime = ref(null)
 const sessionDuration = ref('00:00:00')
 const showStopDialog = ref(false)
 let durationInterval = null
+
+/* === Draggable Panels State === */
+const loggingPanelPos = ref({ x: 0, y: 0 })
+const counterPanelPos = ref({ x: 0, y: 0 })
+const loggingPanelInitialized = ref(false)
+const counterPanelInitialized = ref(false)
+const isDraggingLogging = ref(false)
+const isDraggingCounter = ref(false)
+const dragOffset = ref({ x: 0, y: 0 })
+const loggingPanelZIndex = ref(1000)
+const counterPanelZIndex = ref(1000)
 
 /* === Character Counter State === */
 const isCounting = ref(false)
@@ -661,12 +697,20 @@ onMounted(async () => {
   el.addEventListener('touchstart', markUserIntent, { passive: true })
   el.addEventListener('touchmove', markUserIntent, { passive: true })
   el.addEventListener('mousedown', markUserIntent, { passive: true })
+
+  // Add drag event listeners
+  window.addEventListener('mousemove', onDragMove)
+  window.addEventListener('mouseup', stopDrag)
 })
 
 onBeforeUnmount(() => {
   clearTimeout(userIntentTimeout)
   clearTimeout(scrollCheckTimeout)
   if (durationInterval) clearInterval(durationInterval)
+
+  // Remove drag event listeners
+  window.removeEventListener('mousemove', onDragMove)
+  window.removeEventListener('mouseup', stopDrag)
 })
 
 /* Auto-scroll new messages - ONLY when not paused */
@@ -777,6 +821,96 @@ function selectEmoji(emoji) {
     charItem.char = emoji
   }
   closeEmojiPicker()
+}
+
+/* === Draggable Panel Controls === */
+function startDragLogging(e) {
+  // Initialize position on first drag if not set
+  if (!loggingPanelInitialized.value) {
+    const rect = e.currentTarget.parentElement.getBoundingClientRect()
+    loggingPanelPos.value = {
+      x: rect.left,
+      y: rect.top,
+    }
+    loggingPanelInitialized.value = true
+  }
+
+  isDraggingLogging.value = true
+  const rect = e.currentTarget.parentElement.getBoundingClientRect()
+  dragOffset.value = {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top,
+  }
+  // Bring to front
+  loggingPanelZIndex.value = Math.max(loggingPanelZIndex.value, counterPanelZIndex.value) + 1
+}
+
+function startDragCounter(e) {
+  // Initialize position on first drag if not set
+  if (!counterPanelInitialized.value) {
+    const rect = e.currentTarget.parentElement.getBoundingClientRect()
+    counterPanelPos.value = {
+      x: rect.left,
+      y: rect.top,
+    }
+    counterPanelInitialized.value = true
+  }
+
+  isDraggingCounter.value = true
+  const rect = e.currentTarget.parentElement.getBoundingClientRect()
+  dragOffset.value = {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top,
+  }
+  // Bring to front
+  counterPanelZIndex.value = Math.max(loggingPanelZIndex.value, counterPanelZIndex.value) + 1
+}
+
+function onDragMove(e) {
+  if (isDraggingLogging.value) {
+    // Calculate new position
+    let newX = e.clientX - dragOffset.value.x
+    let newY = e.clientY - dragOffset.value.y
+
+    // Get panel dimensions (approximate)
+    const panelWidth = 280
+    const panelHeight = 400 // approximate max height
+
+    // Constrain to viewport
+    newX = Math.max(0, Math.min(newX, window.innerWidth - panelWidth))
+    newY = Math.max(0, Math.min(newY, window.innerHeight - 100)) // keep at least header visible
+
+    loggingPanelPos.value = { x: newX, y: newY }
+  }
+
+  if (isDraggingCounter.value) {
+    // Calculate new position
+    let newX = e.clientX - dragOffset.value.x
+    let newY = e.clientY - dragOffset.value.y
+
+    // Get panel dimensions (approximate)
+    const panelWidth = 280
+    const panelHeight = 400 // approximate max height
+
+    // Constrain to viewport
+    newX = Math.max(0, Math.min(newX, window.innerWidth - panelWidth))
+    newY = Math.max(0, Math.min(newY, window.innerHeight - 100)) // keep at least header visible
+
+    counterPanelPos.value = { x: newX, y: newY }
+  }
+}
+
+function stopDrag() {
+  isDraggingLogging.value = false
+  isDraggingCounter.value = false
+}
+
+function bringLoggingToFront() {
+  loggingPanelZIndex.value = Math.max(loggingPanelZIndex.value, counterPanelZIndex.value) + 1
+}
+
+function bringCounterToFront() {
+  counterPanelZIndex.value = Math.max(loggingPanelZIndex.value, counterPanelZIndex.value) + 1
 }
 
 function startCounting() {
@@ -1364,6 +1498,29 @@ watchEffect(async () => {
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   font-weight: 600;
   font-size: 0.9rem;
+}
+
+.draggable-handle {
+  cursor: move;
+  user-select: none;
+  transition: background 0.2s ease;
+}
+
+.draggable-handle:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.draggable-handle:active {
+  cursor: grabbing;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.drag-icon {
+  display: inline-block;
+  margin-right: 0.25rem;
+  opacity: 0.5;
+  font-weight: bold;
+  letter-spacing: -2px;
 }
 
 .controls-title {
