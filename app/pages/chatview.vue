@@ -117,13 +117,23 @@
               class="input-group"
             >
               <label>Character {{ index + 1 }}:</label>
-              <input
-                v-model="charItem.char"
-                type="text"
-                maxlength="1"
-                class="char-input"
-                :placeholder="(index + 1).toString()"
-              />
+              <div class="input-with-emoji">
+                <input
+                  v-model="charItem.char"
+                  type="text"
+                  maxlength="1"
+                  class="char-input"
+                  :placeholder="(index + 1).toString()"
+                />
+                <v-btn
+                  icon="mdi-emoticon-happy"
+                  size="x-small"
+                  color="primary"
+                  variant="tonal"
+                  @click="openEmojiPicker(charItem.id)"
+                  title="Pick an emoji"
+                />
+              </div>
               <v-btn
                 v-if="charactersToCount.length > 1"
                 icon="mdi-minus-circle"
@@ -134,6 +144,27 @@
               />
             </div>
           </div>
+
+          <!-- Emoji Picker Dialog -->
+          <div v-if="showEmojiPicker" class="emoji-picker-overlay" @click="closeEmojiPicker">
+            <div class="emoji-picker" @click.stop>
+              <div class="emoji-picker-header">
+                <span>Select an Emoji</span>
+                <v-btn icon="mdi-close" size="x-small" variant="text" @click="closeEmojiPicker" />
+              </div>
+              <div class="emoji-grid">
+                <button
+                  v-for="emoji in popularEmojis"
+                  :key="emoji"
+                  class="emoji-button"
+                  @click="selectEmoji(emoji)"
+                >
+                  {{ emoji }}
+                </button>
+              </div>
+            </div>
+          </div>
+
           <v-btn
             color="secondary"
             size="small"
@@ -213,6 +244,293 @@ const charactersToCount = ref([
   { id: 2, char: '2', count: 0 },
 ])
 let nextCharId = 3
+
+const showEmojiPicker = ref(false)
+const selectedCharId = ref(null)
+
+// Popular emojis for quick selection
+const popularEmojis = [
+  '😀',
+  '😃',
+  '😄',
+  '😁',
+  '😅',
+  '😂',
+  '🤣',
+  '😊',
+  '😇',
+  '🙂',
+  '🙃',
+  '😉',
+  '😌',
+  '😍',
+  '🥰',
+  '😘',
+  '😗',
+  '😙',
+  '😚',
+  '😋',
+  '😛',
+  '😝',
+  '😜',
+  '🤪',
+  '🤨',
+  '🧐',
+  '🤓',
+  '😎',
+  '🤩',
+  '🥳',
+  '😏',
+  '😒',
+  '😞',
+  '😔',
+  '😟',
+  '😕',
+  '🙁',
+  '😣',
+  '😖',
+  '😫',
+  '😩',
+  '🥺',
+  '😢',
+  '😭',
+  '😤',
+  '😠',
+  '😡',
+  '🤬',
+  '🤯',
+  '😳',
+  '🥵',
+  '🥶',
+  '😱',
+  '😨',
+  '😰',
+  '😥',
+  '😓',
+  '🤗',
+  '🤔',
+  '🤭',
+  '🤫',
+  '🤥',
+  '😶',
+  '😐',
+  '😑',
+  '😬',
+  '🙄',
+  '😯',
+  '😦',
+  '😧',
+  '😮',
+  '😲',
+  '🥱',
+  '😴',
+  '🤤',
+  '😪',
+  '😵',
+  '🤐',
+  '🥴',
+  '🤢',
+  '🤮',
+  '🤧',
+  '😷',
+  '🤒',
+  '🤕',
+  '🤑',
+  '🤠',
+  '😈',
+  '👿',
+  '👹',
+  '👺',
+  '🤡',
+  '💩',
+  '👻',
+  '💀',
+  '👽',
+  '👾',
+  '🤖',
+  '🎃',
+  '😺',
+  '😸',
+  '😹',
+  '😻',
+  '😼',
+  '😽',
+  '🙀',
+  '😿',
+  '😾',
+  '❤️',
+  '🧡',
+  '💛',
+  '💚',
+  '💙',
+  '💜',
+  '🖤',
+  '🤍',
+  '🤎',
+  '💔',
+  '❣️',
+  '💕',
+  '💞',
+  '💓',
+  '💗',
+  '💖',
+  '💘',
+  '💝',
+  '💟',
+  '☮️',
+  '✝️',
+  '☪️',
+  '🕉️',
+  '☸️',
+  '✡️',
+  '🔯',
+  '🕎',
+  '☯️',
+  '☦️',
+  '🛐',
+  '⛎',
+  '♈',
+  '♉',
+  '♊',
+  '♋',
+  '♌',
+  '♍',
+  '♎',
+  '♏',
+  '♐',
+  '♑',
+  '♒',
+  '♓',
+  '🆔',
+  '⚛️',
+  '🉑',
+  '☢️',
+  '☣️',
+  '📴',
+  '📳',
+  '🈶',
+  '🈚',
+  '🈸',
+  '🈺',
+  '🈷️',
+  '✴️',
+  '🆚',
+  '💮',
+  '🉐',
+  '㊙️',
+  '㊗️',
+  '🈴',
+  '🈵',
+  '🈹',
+  '🈲',
+  '🅰️',
+  '🅱️',
+  '🆎',
+  '🆑',
+  '🅾️',
+  '🆘',
+  '❌',
+  '⭕',
+  '🛑',
+  '⛔',
+  '📛',
+  '🚫',
+  '💯',
+  '💢',
+  '♨️',
+  '🚷',
+  '🚯',
+  '🚳',
+  '🚱',
+  '🔞',
+  '📵',
+  '🚭',
+  '❗',
+  '❕',
+  '❓',
+  '❔',
+  '‼️',
+  '⁉️',
+  '🔅',
+  '🔆',
+  '〽️',
+  '⚠️',
+  '🚸',
+  '🔱',
+  '⚜️',
+  '🔰',
+  '♻️',
+  '✅',
+  '🈯',
+  '💹',
+  '❇️',
+  '✳️',
+  '❎',
+  '🌐',
+  '💠',
+  '🔰',
+  '✔️',
+  '🔥',
+  '💧',
+  '🌊',
+  '🎵',
+  '🎶',
+  '⚡',
+  '☀️',
+  '⭐',
+  '🌟',
+  '✨',
+  '🎉',
+  '🎊',
+  '🎈',
+  '🎁',
+  '🏆',
+  '🥇',
+  '🥈',
+  '🥉',
+  '⚽',
+  '🏀',
+  '🏈',
+  '⚾',
+  '🥎',
+  '🎾',
+  '🏐',
+  '🏉',
+  '🥏',
+  '🎱',
+  '🪀',
+  '🏓',
+  '👍',
+  '👎',
+  '👊',
+  '✊',
+  '🤛',
+  '🤜',
+  '🤞',
+  '✌️',
+  '🤟',
+  '🤘',
+  '👌',
+  '🤌',
+  '🤏',
+  '👈',
+  '👉',
+  '👆',
+  '👇',
+  '☝️',
+  '✋',
+  '🤚',
+  '🖐️',
+  '🖖',
+  '👋',
+  '🤙',
+  '💪',
+  '🦾',
+  '🖕',
+  '✍️',
+  '🙏',
+  '🦶',
+]
 
 const totalCharacterCount = computed(() => {
   return charactersToCount.value.reduce((sum, item) => sum + item.count, 0)
@@ -392,6 +710,24 @@ function removeCharacter(id) {
   if (charactersToCount.value.length > 1) {
     charactersToCount.value = charactersToCount.value.filter((item) => item.id !== id)
   }
+}
+
+function openEmojiPicker(charId) {
+  selectedCharId.value = charId
+  showEmojiPicker.value = true
+}
+
+function closeEmojiPicker() {
+  showEmojiPicker.value = false
+  selectedCharId.value = null
+}
+
+function selectEmoji(emoji) {
+  const charItem = charactersToCount.value.find((item) => item.id === selectedCharId.value)
+  if (charItem) {
+    charItem.char = emoji
+  }
+  closeEmojiPicker()
 }
 
 function startCounting() {
@@ -1039,6 +1375,12 @@ watchEffect(async () => {
   flex-shrink: 0;
 }
 
+.input-with-emoji {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .char-input {
   width: 50px;
   height: 35px;
@@ -1062,6 +1404,73 @@ watchEffect(async () => {
 
 .char-input::placeholder {
   color: rgba(255, 255, 255, 0.3);
+}
+
+/* Emoji Picker Styles */
+.emoji-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(4px);
+}
+
+.emoji-picker {
+  background: rgba(20, 20, 20, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 400px;
+  max-height: 500px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.emoji-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(45px, 1fr));
+  gap: 0.25rem;
+  padding: 1rem;
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.emoji-button {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 0.5rem;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+}
+
+.emoji-button:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: #4fc3f7;
+  transform: scale(1.1);
+}
+
+.emoji-button:active {
+  transform: scale(0.95);
 }
 
 .character-counts {
